@@ -1,5 +1,5 @@
 from django.db import models
-#from django.contrib.postgres.fields import JSONField, ArrayField
+from django.contrib.postgres.fields import JSONField, ArrayField
 
 
 PROBLEM_GENERATOR_CHOICES = [
@@ -13,9 +13,12 @@ class Result(models.Model):
     rows = models.IntegerField()
     cols = models.IntegerField()
 
-    # TODO: after install psycopg2
-    # result_tree = JSONField(blank=True, null=True)
-    # tiles = models.ArrayField()
+    result_tree = JSONField(blank=True, null=True)
+    tiles = ArrayField(
+        ArrayField(
+            models.IntegerField(),
+            size=2,
+        ))
     score = models.FloatField(blank=True, null=True)
 
     problem_generator = models.CharField(

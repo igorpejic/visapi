@@ -89,7 +89,7 @@ DATABASES = {
     }
 }
 
-with open(os.path.join(BASE_DIR, "secrets.json")) as f:
+with open(os.path.join(BASE_DIR, "visapi", "secrets.json")) as f:
     secrets = json.loads(f.read())
 
 def get_secret(setting, secrets=secrets):
