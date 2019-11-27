@@ -196,6 +196,7 @@ class CustomMCTS():
         state = self.state
         available_tiles = state.tiles
         prev_state = state
+        solution_found = False
 
         depth = 0
         val = 1
@@ -206,7 +207,8 @@ class CustomMCTS():
                 success, new_board = self.get_next_turn(state, tile, val)
                 if success == ALL_TILES_USED:
                     print('solution found!')
-                    return initial_state
+                    solution_found = True
+                    return initial_state, depth, solution_found
                 if success == TILE_CANNOT_BE_PLACED:
                     # cannot place the tile.  this branch will not be considered
                     states.append(None)
@@ -223,7 +225,7 @@ class CustomMCTS():
                     states.append(new_state)
             if not tile_placed:
                 # no tile was placed, it's a dead end; end game
-                return initial_state
+                return initial_state, depth, solution_found
 
             val += 1
             depth += 1
@@ -234,7 +236,8 @@ class CustomMCTS():
             state = new_state
 
         print('Solution found!')
-        return initial_state
+        solution_found = True
+        return initial_state, depth, solution_found
 
     def get_next_turn(self, state, tile, val=1):
         new_board = np.copy(state.board)

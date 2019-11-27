@@ -7,6 +7,11 @@ PROBLEM_GENERATOR_CHOICES = [
     ('florian', 'florian'),
 ]
 
+STRATEGY_CHOICES = [
+    ('max_depth', 'max_depth'),
+    ('avg_depth', 'avg_depth'),
+]
+
 class Result(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
 
@@ -20,11 +25,17 @@ class Result(models.Model):
             models.IntegerField(),
             size=2,
         ))
-    score = models.FloatField(blank=True, null=True)
+    score = models.FloatField(blank=True, null=True, help_text='Tiles left')
+    solution_found = models.BooleanField(default=False)
 
     problem_generator = models.CharField(
         max_length=100,
     choices=PROBLEM_GENERATOR_CHOICES)
+
+    strategy = models.CharField(
+        max_length=100,
+        choices=STRATEGY_CHOICES, 
+        default='max_depth')
 
     class Meta:
         db_table = 'affinity'
