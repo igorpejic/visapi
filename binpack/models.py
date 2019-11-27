@@ -12,6 +12,7 @@ class Result(models.Model):
 
     rows = models.IntegerField()
     cols = models.IntegerField()
+    n_simulations = models.IntegerField()
 
     result_tree = JSONField(blank=True, null=True)
     tiles = ArrayField(
@@ -31,3 +32,6 @@ class Result(models.Model):
 
     def __repr__(self):
         return f'{self.created_on} -{len(self.tiles)} ({self.rows} x {self.cols})'
+
+    def __str__(self):
+        return self.__repr__()
