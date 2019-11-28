@@ -1,0 +1,13 @@
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 10 11 11 --n_sim 100
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 20 20 20 --n_sim 100
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 20 20 20 --n_sim 1000
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 20 20 20 --n_sim 10000
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 20 20 20 --n_sim 100000
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 30 20 20 --n_sim 100
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 30 20 20 --n_sim 1000
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 30 20 20 --n_sim 10000
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 30 20 20 --n_sim 100000
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 40 20 20 --n_sim 100
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 40 20 20 --n_sim 1000
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 40 20 20 --n_sim 10000
+PYTHONPATH=~/personal/college/th/code/ python3 manage.py run_mcts 40 20 20 --n_sim 100000

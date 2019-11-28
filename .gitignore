@@ -2,3 +2,6 @@
 secrets.json
 *.pyc
 results/
+puzzles.csv
+*.swp
+*.swo

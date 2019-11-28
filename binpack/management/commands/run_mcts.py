@@ -26,22 +26,46 @@ RESULTS_DIR = 'results/'
 np.random.seed(123) # reproducibility
 
 ORIENTATIONS = 2
-def run_mcts(tiles, rows, cols, n_sim):
-    w = cols
-    h = rows
-    n = tiles
-    #n = 16
-    #w = 10
-    #h = 10
+def run_mcts(options):
+    cols = options['cols']
+    rows = options['rows']
+    n = options['n_tiles']
+    from_file = options['from_file']
+    n_sim = options['n_sim']
 
+    n_problems_to_solve = 100
+    dg = DataGenerator(cols, rows)
+    instances = []
+    if from_file:
+        instances_from_file = dg.read_instances()
+        for cols_rows, v in instances_from_file[n].items():
+            for instance_from_file in v:
+                instance = dg.transform_instance_visual_to_tiles_and_board(
+                    cols_rows[1], cols_rows[0],
+                    instance_from_file, order_tiles=True)
+            instances.append(instance)
+    else:
+        for i in range(n_problems_to_solve):
+            instances.append(dg.gen_tiles_and_board(
+            n, cols, rows, order_tiles=True, from_file=from_file))
+
+    for i, instance in enumerate(instances):
+        if i == 100:
+            break
+        print(instance)
+        tiles, board = instance
+        run_one_simulation(
+            tiles, board, board.shape[1], board.shape[0], n_sim, from_file)
+
+
+def run_one_simulation(tiles, board, cols, rows, n_sim, from_file):
+
+    n = len(tiles) / ORIENTATIONS
     N_simulations = n_sim
-    from_file = False
-
-    dg = DataGenerator(w, h)
-    tiles, board = dg.gen_tiles_and_board(n, w, h, order_tiles=True, from_file=from_file)
-    print(f'Starting problem with width {w}, height {h} and {n} tiles')
+    print(f'Starting problem with rows {rows}, cols {cols} and {len(tiles) / 2} tiles')
     print(f'TILES: {tiles}')
     print(f'Performing: {N_simulations} simulations per possible tile-action')
+
 
     custom_mcts = CustomMCTS(tiles, board)
 
@@ -59,7 +83,7 @@ def run_mcts(tiles, rows, cols, n_sim):
     if from_file:
         from_file_str = 'from_file'
 
-    output_filename_base = f'{n}_{w}_{h}_{from_file_str}_{N_simulations}'
+    output_filename_base = f'{n}_{cols}_{rows}_{from_file_str}_{N_simulations}'
     k_v_json = json.dumps(k_v, cls=NpEncoder)
 
     tree_json = json.dumps(ret.render_to_json(), cls=NpEncoder)
@@ -67,8 +91,8 @@ def run_mcts(tiles, rows, cols, n_sim):
     with open(os.path.join(RESULTS_DIR, output_filename_base) + '_tree.json', 'w') as f:
         f.write(tree_json)
     Result.objects.create(
-        rows=h,
-        cols=w,
+        rows=rows,
+        cols=cols,
         tiles=tiles[:int(len(tiles)/2)],
         result_tree=tree_json,
         problem_generator=problem_generator,
@@ -92,11 +116,11 @@ class Command(BaseCommand):
     help = "Run mcts"
 
     def add_arguments(self, parser):
-        parser.add_argument('tiles', type=int, default=10, help='number of tiles')
+        parser.add_argument('n_tiles', type=int, default=10, help='number of tiles')
         parser.add_argument('rows', type=int, default=10, help='number of rows')
         parser.add_argument('cols', type=int, default=10, help='number of cols')
         parser.add_argument('--n_sim', type=int, default=10, help='number of simulations from each action')
+        parser.add_argument('--from_file', action='store_true', help='use instances from file')
 
     def handle(self, *args, **options):
-        n_sim = options['n_sim']
-        run_mcts(options['tiles'], options['rows'], options['cols'], n_sim)
+        run_mcts(options)
