@@ -32,6 +32,7 @@ def run_mcts(options):
     n = options['n_tiles']
     from_file = options['from_file']
     n_sim = options['n_sim']
+    strategy = 'avg_depth' if options['avg_depth'] else 'max_depth'
 
     n_problems_to_solve = 100
     dg = DataGenerator(cols, rows)
@@ -55,10 +56,11 @@ def run_mcts(options):
         print(instance)
         tiles, board = instance
         run_one_simulation(
-            tiles, board, board.shape[1], board.shape[0], n_sim, from_file)
+            tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
+        strategy=strategy)
 
 
-def run_one_simulation(tiles, board, cols, rows, n_sim, from_file):
+def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth'):
 
     n = len(tiles) / ORIENTATIONS
     N_simulations = n_sim
@@ -67,7 +69,7 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file):
     print(f'Performing: {N_simulations} simulations per possible tile-action')
 
 
-    custom_mcts = CustomMCTS(tiles, board)
+    custom_mcts = CustomMCTS(tiles, board, strategy=strategy)
 
     ret, depth, solution_found = custom_mcts.predict(N=N_simulations)
 
@@ -98,7 +100,8 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file):
         problem_generator=problem_generator,
         n_simulations=N_simulations,
         solution_found=solution_found,
-        score=score
+        score=score,
+        strategy=strategy
     )
     tree, all_nodes = ret.render_children(only_ids=False)
     tr = LeftAligned()
@@ -121,6 +124,7 @@ class Command(BaseCommand):
         parser.add_argument('cols', type=int, default=10, help='number of cols')
         parser.add_argument('--n_sim', type=int, default=10, help='number of simulations from each action')
         parser.add_argument('--from_file', action='store_true', help='use instances from file')
+        parser.add_argument('--avg_depth', action='store_true', help='avg_depth')
 
     def handle(self, *args, **options):
         run_mcts(options)

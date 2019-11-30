@@ -63,7 +63,7 @@ ROOT_URLCONF = 'visapi.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'static')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -95,7 +95,8 @@ DATABASES = {
     }
 }
 
-with open(os.path.join(BASE_DIR, "visapi", "secrets.json")) as f:
+secrets_file = os.getenv("SECRETS_FILE", "secrets.json")
+with open(os.path.join(BASE_DIR, "visapi", secrets_file)) as f:
     secrets = json.loads(f.read())
 
 def get_secret(setting, secrets=secrets):
@@ -105,13 +106,14 @@ def get_secret(setting, secrets=secrets):
         err = "Set the %s in mnlth/settings/secrets.json file." % setting
         raise ImproperlyConfigured(err)
 
-DB_HOST, DB_NAME, DB_USER, DB_PASSWORD = get_secret("DATABASE")
+DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT = get_secret("DATABASE")
 
 for db in DATABASES.values():
     db["HOST"] = DB_HOST
     db["NAME"] = DB_NAME
     db["USER"] = DB_USER
     db["PASSWORD"] = DB_PASSWORD
+    db["PORT"] = DB_PORT
 
 SECRET_KEY = get_secret("SECRET_KEY")
 
@@ -152,9 +154,23 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = 'static'
+
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, "static", "build", "static"),  # update the STATICFILES_DIRS
+)
 
 # CORS
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:3000',
+    'http://localhost:8000',
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:8000',
+    'https://pristine-glass-255517.appspot.com',
+    'http://pristine-glass-255517.appspot.com',
  ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'binpack.pagination.PagePagination',
+    'PAGE_SIZE': 20
+}

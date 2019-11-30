@@ -178,7 +178,7 @@ def get_max_index(_list):
     return max_index
 
 class CustomMCTS():
-    def __init__(self, tiles, board):
+    def __init__(self, tiles, board, strategy='max_depth'):
         self.Qsa = {}       # stores Q values for s,a (as defined in the paper)
         self.Nsa = {}       # stores #times edge s,a was visited
         self.Ns = {}        # stores #times board s was visited
@@ -190,6 +190,7 @@ class CustomMCTS():
         self.initial_tiles, self.initial_board = tiles, board
         self.state = State(self.initial_board, self.initial_tiles)
         self.solution_checker = SolutionChecker(len(tiles), get_rows(board), get_cols(board))
+        self.strategy=strategy
 
     def predict(self, temp=1, N=3000):
         initial_state = self.state
@@ -268,8 +269,10 @@ class CustomMCTS():
         depths = []
         for n in range(N):
             depths.append(self.perform_simulation(state.copy()))
-        _max = np.max(np.array(depths))
-        #_max = np.average(np.array(depths))
+        if self.strategy=='max_depth':
+            _max = np.max(np.array(depths))
+        elif self.strategy == 'avg_depth':
+            _max = np.average(np.array(depths))
         return _max
 
 

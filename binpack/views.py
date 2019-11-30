@@ -8,6 +8,6 @@ class ResultSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ResultViewSet(viewsets.ModelViewSet):
+class ResultViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Result.objects.all()
     serializer_class = ResultSerializer

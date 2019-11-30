@@ -5,3 +5,5 @@ results/
 puzzles.csv
 *.swp
 *.swo
+secrets.json*
+static/
