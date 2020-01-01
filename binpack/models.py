@@ -25,6 +25,7 @@ class Result(models.Model):
             models.IntegerField(),
             size=2,
         ))
+    n_tiles = models.IntegerField(blank=True, null=True)
     score = models.FloatField(blank=True, null=True, help_text='Tiles left')
     solution_found = models.BooleanField(default=False)
 

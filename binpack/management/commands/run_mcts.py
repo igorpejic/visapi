@@ -34,7 +34,6 @@ def run_mcts(options):
     n_sim = options['n_sim']
     strategy = 'avg_depth' if options['avg_depth'] else 'max_depth'
 
-    n_problems_to_solve = 100
     dg = DataGenerator(cols, rows)
     instances = []
     if from_file:
@@ -46,6 +45,7 @@ def run_mcts(options):
                     instance_from_file, order_tiles=True)
             instances.append(instance)
     else:
+        n_problems_to_solve = 100
         for i in range(n_problems_to_solve):
             instances.append(dg.gen_tiles_and_board(
             n, cols, rows, order_tiles=True, from_file=from_file))
@@ -95,10 +95,11 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     Result.objects.create(
         rows=rows,
         cols=cols,
-        tiles=tiles[:int(len(tiles)/2)],
+        tiles=tiles[:int(len(tiles)/ORIENTATIONS)],
         result_tree=tree_json,
         problem_generator=problem_generator,
         n_simulations=N_simulations,
+        n_tiles=int(len(tiles) / ORIENTATIONS),
         solution_found=solution_found,
         score=score,
         strategy=strategy
