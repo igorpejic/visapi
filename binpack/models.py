@@ -38,7 +38,10 @@ class Result(models.Model):
         choices=STRATEGY_CHOICES, 
         default='max_depth')
 
-    n_tiles_placed = models.IntegerField(blank=True, null=True)
+    n_tiles_placed = models.IntegerField(blank=True, null=True, help_text='Number of tiles placed before a solution was found')
+
+    their_id = models.IntegerField(blank=True, null=True, help_text='ID from external dataset.')
+    their_tiles_placed = models.IntegerField(blank=True, null=True, help_text='Amount of tiles placed with heuristics algorithm')
 
     class Meta:
         db_table = 'affinity'

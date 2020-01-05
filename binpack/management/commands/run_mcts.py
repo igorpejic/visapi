@@ -42,8 +42,10 @@ def run_mcts(options):
             for instance_from_file in v:
                 instance = dg.transform_instance_visual_to_tiles_and_board(
                     cols_rows[1], cols_rows[0],
-                    instance_from_file, order_tiles=True)
-            instances.append(instance)
+                    instance_from_file.bins, order_tiles=True)
+
+            # this is intentionally unindentend; one instance per rows, cols, n_tiles
+            instances.append((instance, instance_from_file))
     else:
         n_problems_to_solve = 1
         for i in range(n_problems_to_solve):
@@ -55,13 +57,19 @@ def run_mcts(options):
         # if i == 100:
         #     break
         print(instance)
-        tiles, board = instance
+        if from_file:
+            tiles, board = instance[0]
+            their_info = instance[1]
+        else:
+            tiles, board = instance
+            their_info = None
+
         run_one_simulation(
             tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-        strategy=strategy)
+        strategy=strategy, their_info=their_info)
 
 
-def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth'):
+def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth', their_info=None):
 
     n = len(tiles) / ORIENTATIONS
     N_simulations = n_sim
@@ -70,15 +78,24 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     print(f'TILES: {tiles}')
     print(f'Performing: {N_simulations} simulations per possible tile-action')
 
+    identifying_kwargs = {
+        'rows': rows,
+        'cols': cols,
+        'n_simulations': N_simulations,
+        'tiles': tiles[:int(len(tiles)/ORIENTATIONS)],
+        'problem_generator': problem_generator,
+        'strategy': strategy
+    }
     results = Result.objects.filter(
-        rows=rows, cols=cols,
-        tiles=tiles[:int(len(tiles)/ORIENTATIONS)],
-        problem_generator=problem_generator,
-        strategy=strategy
+        **identifying_kwargs
     )
     if results and from_file:
-        print(f'Result already exists. Skipping. (results)')
+        print(f'Result already exists or is being worked on. Skipping. (results)')
         return
+    else:
+        Result.objects.create(
+            **identifying_kwargs
+        )
 
     custom_mcts = CustomMCTS(tiles, board, strategy=strategy)
 
@@ -102,18 +119,26 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     tree_json = json.dumps(ret.render_to_json(), cls=NpEncoder)
     with open(os.path.join(RESULTS_DIR, output_filename_base) + '_tree.json', 'w') as f:
         f.write(tree_json)
-    Result.objects.create(
-        rows=rows,
-        cols=cols,
-        tiles=tiles[:int(len(tiles)/ORIENTATIONS)],
+    results = Result.objects.filter(
+        score__isnull=True,
+        **identifying_kwargs
+    )
+    if from_file:
+        their_id = their_info.id
+        their_info = their_info.n_tiles_placed
+    else:
+        their_id = None
+        their_info = None
+
+    results.update(
         result_tree=tree_json,
-        problem_generator=problem_generator,
         n_simulations=N_simulations,
         n_tiles=int(len(tiles) / ORIENTATIONS),
         solution_found=solution_found,
         score=score,
-        strategy=strategy,
-        n_tiles_placed=custom_mcts.n_tiles_placed
+        n_tiles_placed=custom_mcts.n_tiles_placed,
+        their_id=their_id,
+        their_tiles_placed=their_info
     )
     tree, all_nodes = ret.render_children(only_ids=False)
     tr = LeftAligned()
