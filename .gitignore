@@ -7,3 +7,4 @@ puzzles.csv
 *.swo
 secrets.json*
 static/
+.ipynb_checkpoints

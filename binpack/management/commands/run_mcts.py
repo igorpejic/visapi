@@ -50,9 +50,10 @@ def run_mcts(options):
             instances.append(dg.gen_tiles_and_board(
             n, cols, rows, order_tiles=True, from_file=from_file))
 
+
     for i, instance in enumerate(instances):
-        if i == 100:
-            break
+        # if i == 100:
+        #     break
         print(instance)
         tiles, board = instance
         run_one_simulation(
@@ -64,10 +65,20 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
 
     n = len(tiles) / ORIENTATIONS
     N_simulations = n_sim
+    problem_generator = 'florian' if from_file else 'guillotine'
     print(f'Starting problem with rows {rows}, cols {cols} and {len(tiles) / 2} tiles')
     print(f'TILES: {tiles}')
     print(f'Performing: {N_simulations} simulations per possible tile-action')
 
+    results = Result.objects.filter(
+        rows=rows, cols=cols,
+        tiles=tiles[:int(len(tiles)/ORIENTATIONS)],
+        problem_generator=problem_generator,
+        strategy=strategy
+    )
+    if results:
+        print(f'Result already exists. Skipping. (results)')
+        return
 
     custom_mcts = CustomMCTS(tiles, board, strategy=strategy)
 
@@ -89,7 +100,6 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     k_v_json = json.dumps(k_v, cls=NpEncoder)
 
     tree_json = json.dumps(ret.render_to_json(), cls=NpEncoder)
-    problem_generator = 'florian' if from_file else 'guillotine'
     with open(os.path.join(RESULTS_DIR, output_filename_base) + '_tree.json', 'w') as f:
         f.write(tree_json)
     Result.objects.create(
