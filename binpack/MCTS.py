@@ -274,8 +274,9 @@ class CustomMCTS():
         '''
         depths = []
         for n in range(N):
-            depth = self.perform_simulation(state.copy())
+            depth, simulation_root_state = self.perform_simulation(state.copy())
             if depth == ALL_TILES_USED:
+                state.children = simulation_root_state.children
                 return ALL_TILES_USED
             else:
                 depths.append(depth)
@@ -287,33 +288,43 @@ class CustomMCTS():
 
 
     def perform_simulation(self, state):
+        '''
+        Performs the simulation until legal moves are available.
+        If simulation ends by finding a solution, a root state starting from this simulation is returned
+        '''
+
         depth = 0
+        simulation_root_state = state  # in case simulation ends in solution; these states are the solution
         if len(state.tiles) == 0:
             print('perform_simulation called with empty tiles')
-            return ALL_TILES_USED
+            return ALL_TILES_USED, simulation_root_state
         while True:
             val = 1
             if len(state.tiles) == 0:
                 print('solution found in simulation')
-                return ALL_TILES_USED
+                return ALL_TILES_USED, simulation_root_state
             next_random_tile = np.random.randint(len(state.tiles))
             success, new_board = self.get_next_turn(
                 state, state.tiles[next_random_tile], val)
             if success == ALL_TILES_USED:
                 # no LFB on grid; probably means grid is full
-                return ALL_TILES_USED
+                return ALL_TILES_USED, simulation_root_state
             elif success == NO_NEXT_POSITION_TILES_UNUSED:
                 print('no next position with unused tiles')
-                return depth
+                return depth, simulation_root_state
             elif success == TILE_CANNOT_BE_PLACED:
                 # cannot place the tile. return depth reached
-                return depth
+                return depth, simulation_root_state
             else:
                 new_tiles = eliminate_pair_tiles(state.tiles, next_random_tile)
-                state = State(board=new_board, tiles=new_tiles, parent=state)
+                new_state = State(board=new_board, tiles=new_tiles, parent=state)
+
+                new_state.score = -1  #  because no simulation is performed
+                state.children.append(new_state)
+                state = new_state
             depth += 1
 
-        return depth
+        return depth, simulation_root_state
 
 
 class MCTS():
