@@ -38,6 +38,8 @@ class Result(models.Model):
         choices=STRATEGY_CHOICES, 
         default='max_depth')
 
+    n_tiles_placed = models.IntegerField(blank=True, null=True)
+
     class Meta:
         db_table = 'affinity'
         unique_together = (('created_on', 'problem_generator', 'rows', 'cols'),)

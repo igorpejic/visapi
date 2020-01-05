@@ -45,7 +45,7 @@ def run_mcts(options):
                     instance_from_file, order_tiles=True)
             instances.append(instance)
     else:
-        n_problems_to_solve = 100
+        n_problems_to_solve = 1
         for i in range(n_problems_to_solve):
             instances.append(dg.gen_tiles_and_board(
             n, cols, rows, order_tiles=True, from_file=from_file))
@@ -76,7 +76,7 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
         problem_generator=problem_generator,
         strategy=strategy
     )
-    if results:
+    if results and from_file:
         print(f'Result already exists. Skipping. (results)')
         return
 
@@ -112,12 +112,14 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
         n_tiles=int(len(tiles) / ORIENTATIONS),
         solution_found=solution_found,
         score=score,
-        strategy=strategy
+        strategy=strategy,
+        n_tiles_placed=custom_mcts.n_tiles_placed
     )
     tree, all_nodes = ret.render_children(only_ids=False)
     tr = LeftAligned()
     res = tr(tree)
     print(res)
+    print(f'Tiles placed: {custom_mcts.n_tiles_placed}')
 
     output_filename = output_filename_base + '.txt'
     output_filename = os.path.join(RESULTS_DIR, output_filename)

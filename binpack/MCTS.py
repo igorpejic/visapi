@@ -191,6 +191,7 @@ class CustomMCTS():
         self.state = State(self.initial_board, self.initial_tiles)
         self.solution_checker = SolutionChecker(len(tiles), get_rows(board), get_cols(board))
         self.strategy=strategy
+        self.n_tiles_placed = 0
 
     def predict(self, temp=1, N=3000):
         initial_state = self.state
@@ -221,6 +222,9 @@ class CustomMCTS():
                         board=new_board, tiles=new_tiles, parent=state)
                     state.children.append(new_state)
                     simulation_result = self.perform_simulations(new_state, N=N)
+                    if simulation_result == ALL_TILES_USED:
+                        print('solution found in simulation!')
+                        return initial_state, depth, solution_found
                     new_state.score = simulation_result
                     new_state.tile_placed = tile
                     states.append(new_state)
@@ -254,6 +258,8 @@ class CustomMCTS():
             tile, SolutionChecker.get_next_lfb_on_grid(new_board),
             val, new_board, get_cols(new_board), get_rows(new_board))
 
+        self.n_tiles_placed += 1
+
         if not success:
             # cannot place the tile. this branch will not be considered
             return TILE_CANNOT_BE_PLACED, None
@@ -268,7 +274,11 @@ class CustomMCTS():
         '''
         depths = []
         for n in range(N):
-            depths.append(self.perform_simulation(state.copy()))
+            depth = self.perform_simulation(state.copy())
+            if depth == ALL_TILES_USED:
+                return ALL_TILES_USED
+            else:
+                depths.append(depth)
         if self.strategy=='max_depth':
             _max = np.max(np.array(depths))
         elif self.strategy == 'avg_depth':
@@ -279,28 +289,29 @@ class CustomMCTS():
     def perform_simulation(self, state):
         depth = 0
         if len(state.tiles) == 0:
-            return 0
+            print('perform_simulation called with empty tiles')
+            return ALL_TILES_USED
         while True:
             val = 1
+            if len(state.tiles) == 0:
+                print('solution found in simulation')
+                return ALL_TILES_USED
             next_random_tile = np.random.randint(len(state.tiles))
             success, new_board = self.get_next_turn(
                 state, state.tiles[next_random_tile], val)
-
             if success == ALL_TILES_USED:
                 # no LFB on grid; probably means grid is full
-                return depth + 1
-            if success == NO_NEXT_POSITION_TILES_UNUSED:
+                return ALL_TILES_USED
+            elif success == NO_NEXT_POSITION_TILES_UNUSED:
+                print('no next position with unused tiles')
                 return depth
-
-            if success == TILE_CANNOT_BE_PLACED:
+            elif success == TILE_CANNOT_BE_PLACED:
                 # cannot place the tile. return depth reached
                 return depth
             else:
                 new_tiles = eliminate_pair_tiles(state.tiles, next_random_tile)
                 state = State(board=new_board, tiles=new_tiles, parent=state)
             depth += 1
-            if not new_tiles:
-                return depth
 
         return depth
 
