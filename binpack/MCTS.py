@@ -224,6 +224,7 @@ class CustomMCTS():
                     simulation_result = self.perform_simulations(new_state, N=N)
                     if simulation_result == ALL_TILES_USED:
                         print('solution found in simulation!')
+                        solution_found = True
                         return initial_state, depth, solution_found
                     new_state.score = simulation_result
                     new_state.tile_placed = tile

@@ -101,7 +101,10 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
 
     ret, depth, solution_found = custom_mcts.predict(N=N_simulations)
 
-    score = len(tiles) / ORIENTATIONS - depth
+    if solution_found:
+        score = 0
+    else:
+        score = len(tiles) / ORIENTATIONS - depth
     child = ret.children[0]
 
     tree, all_nodes = ret.render_children(only_ids=True)
