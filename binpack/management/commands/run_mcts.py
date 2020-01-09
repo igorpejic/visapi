@@ -64,6 +64,7 @@ def run_mcts(options):
     else:
         n_problems_to_solve = 200
         for i in range(n_problems_to_solve):
+            dg = DataGenerator(cols, rows)
             cols = random.randint(0, 40)
             rows = random.randint(0, 40)
             tiles, board = dg.gen_tiles_and_board(
