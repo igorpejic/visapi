@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 import json
 from binpack.MCTS import CustomMCTS
+import random
 from binpack.models import Result
 from data_generator import DataGenerator
 from asciitree import LeftAligned
@@ -36,6 +37,7 @@ def run_mcts(options):
 
     dg = DataGenerator(cols, rows)
     instances = []
+    their_info = None
     if from_file:
         instances_from_file = dg.read_instances()
         for cols_rows, v in instances_from_file[n].items():
@@ -46,27 +48,30 @@ def run_mcts(options):
 
             # this is intentionally unindentend; one instance per rows, cols, n_tiles
             instances.append((instance, instance_from_file))
+
+        for i, instance in enumerate(instances):
+            print(instance)
+            if from_file:
+                tiles, board = instance[0]
+                their_info = instance[1]
+            else:
+                tiles, board = instance
+                their_info = None
+
+            run_one_simulation(
+                tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
+            strategy=strategy, their_info=their_info)
     else:
-        n_problems_to_solve = 1
+        n_problems_to_solve = 200
         for i in range(n_problems_to_solve):
-            instances.append(dg.gen_tiles_and_board(
-            n, cols, rows, order_tiles=True, from_file=from_file))
+            cols = random.randint(0, 40)
+            rows = random.randint(0, 40)
+            tiles, board = dg.gen_tiles_and_board(
+            n, cols, rows, order_tiles=True, from_file=from_file)
+            run_one_simulation(
+                tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
+            strategy=strategy, their_info=their_info)
 
-
-    for i, instance in enumerate(instances):
-        # if i == 100:
-        #     break
-        print(instance)
-        if from_file:
-            tiles, board = instance[0]
-            their_info = instance[1]
-        else:
-            tiles, board = instance
-            their_info = None
-
-        run_one_simulation(
-            tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-        strategy=strategy, their_info=their_info)
 
 
 def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth', their_info=None):
