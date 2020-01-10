@@ -62,16 +62,17 @@ def run_mcts(options):
                 tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
             strategy=strategy, their_info=their_info)
     else:
-        n_problems_to_solve = 200
+        n_problems_to_solve = 2
         for i in range(n_problems_to_solve):
+            cols = random.randint(10, 40)
+            rows = random.randint(10, 40)
             dg = DataGenerator(cols, rows)
-            cols = random.randint(0, 40)
-            rows = random.randint(0, 40)
             tiles, board = dg.gen_tiles_and_board(
             n, cols, rows, order_tiles=True, from_file=from_file)
-            run_one_simulation(
-                tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-            strategy=strategy, their_info=their_info)
+            for strategy in ['max_depth', 'avg_depth']:
+                run_one_simulation(
+                    tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
+                strategy=strategy, their_info=their_info)
 
 
 
