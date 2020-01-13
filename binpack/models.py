@@ -43,6 +43,8 @@ class Result(models.Model):
     their_id = models.IntegerField(blank=True, null=True, help_text='ID from external dataset.')
     their_tiles_placed = models.IntegerField(blank=True, null=True, help_text='Amount of tiles placed with heuristics algorithm')
 
+    problem_id = models.CharField(blank=True, null=True, max_length=500)
+
     class Meta:
         db_table = 'affinity'
         unique_together = (('created_on', 'problem_generator', 'rows', 'cols'),)

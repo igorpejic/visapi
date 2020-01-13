@@ -10,6 +10,7 @@ from collections import OrderedDict as OD
 
 import os
 import argparse
+import uuid
 
 import numpy as np
 class NpEncoder(json.JSONEncoder):
@@ -62,21 +63,25 @@ def run_mcts(options):
                 tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
             strategy=strategy, their_info=their_info)
     else:
-        n_problems_to_solve = 2
+        n_problems_to_solve = 10
         for i in range(n_problems_to_solve):
             cols = random.randint(10, 40)
             rows = random.randint(10, 40)
             dg = DataGenerator(cols, rows)
             tiles, board = dg.gen_tiles_and_board(
             n, cols, rows, order_tiles=True, from_file=from_file)
-            for strategy in ['max_depth', 'avg_depth']:
+            problem_identifier = uuid.uuid4()
+            for n_sim in [100, 500, 1000, 2000, 5000, 10000]:
+                # for strategy in ['max_depth', 'avg_depth']:
+                strategy = 'max_depth'
                 run_one_simulation(
                     tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-                strategy=strategy, their_info=their_info)
+                strategy=strategy, their_info=their_info,
+                    problem_identifier=problem_identifier)
 
 
 
-def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth', their_info=None):
+def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth', their_info=None, problem_identifier=None):
 
     n = len(tiles) / ORIENTATIONS
     N_simulations = n_sim
@@ -91,7 +96,8 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
         'n_simulations': N_simulations,
         'tiles': tiles[:int(len(tiles)/ORIENTATIONS)],
         'problem_generator': problem_generator,
-        'strategy': strategy
+        'strategy': strategy,
+        'problem_id': problem_identifier
     }
     results = Result.objects.filter(
         **identifying_kwargs
