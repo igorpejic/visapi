@@ -149,18 +149,16 @@ def get_cols(board):
 def get_rows(board):
     return board.shape[0]
 
-def eliminate_pair_tiles(tiles, index):
+def eliminate_pair_tiles(tiles, tile_to_remove):
     '''
     search through the list to find rotated instance, 
     then remove both
     '''
-    tile_to_remove = tiles[index]
-    rotated_tile = (tile_to_remove[1], tile_to_remove[0])
-
-
     old_tiles = tiles[:]
+    index = old_tiles.index(tile_to_remove)
     new_tiles = old_tiles[:index] + old_tiles[index + 1:]
 
+    rotated_tile = (tile_to_remove[1], tile_to_remove[0])
     rotated_tile_index = new_tiles.index(rotated_tile)
 
     new_tiles = new_tiles[:rotated_tile_index] + new_tiles[rotated_tile_index + 1:]
@@ -217,7 +215,7 @@ class CustomMCTS():
                     continue
                 else:
                     tile_placed = True
-                    new_tiles = eliminate_pair_tiles(state.tiles, i)
+                    new_tiles = eliminate_pair_tiles(state.tiles, tile)
                     new_state = State(
                         board=new_board, tiles=new_tiles, parent=state)
                     state.children.append(new_state)
@@ -287,6 +285,14 @@ class CustomMCTS():
             _max = np.average(np.array(depths))
         return _max
 
+    def get_valid_next_moves(self, state, tiles, val=1):
+        possible_tile_moves = []
+        for tile in tiles:
+            success, new_board = self.get_next_turn(
+                state, tile, val)
+            if success != TILE_CANNOT_BE_PLACED and success != NO_NEXT_POSITION_TILES_UNUSED:
+                possible_tile_moves.append(tile)
+        return possible_tile_moves
 
     def perform_simulation(self, state):
         '''
@@ -304,9 +310,14 @@ class CustomMCTS():
             if len(state.tiles) == 0:
                 print('solution found in simulation')
                 return ALL_TILES_USED, simulation_root_state
-            next_random_tile = np.random.randint(len(state.tiles))
+            valid_moves = self.get_valid_next_moves(state, state.tiles )
+            if not valid_moves:
+                return depth, simulation_root_state
+
+            next_random_tile_index = np.random.randint(len(valid_moves))
             success, new_board = self.get_next_turn(
-                state, state.tiles[next_random_tile], val)
+                state, valid_moves[next_random_tile_index], val)
+
             if success == ALL_TILES_USED:
                 # no LFB on grid; probably means grid is full
                 return ALL_TILES_USED, simulation_root_state
@@ -317,7 +328,7 @@ class CustomMCTS():
                 # cannot place the tile. return depth reached
                 return depth, simulation_root_state
             else:
-                new_tiles = eliminate_pair_tiles(state.tiles, next_random_tile)
+                new_tiles = eliminate_pair_tiles(state.tiles, valid_moves[next_random_tile_index])
                 new_state = State(board=new_board, tiles=new_tiles, parent=state)
 
                 new_state.score = -1  #  because no simulation is performed
