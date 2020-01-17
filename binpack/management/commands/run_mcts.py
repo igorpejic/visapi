@@ -7,6 +7,7 @@ from binpack.models import Result
 from data_generator import DataGenerator
 from asciitree import LeftAligned
 from collections import OrderedDict as OD
+from cProfile import Profile
 
 import os
 import argparse
@@ -63,8 +64,8 @@ def run_mcts(options):
                 tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
             strategy=strategy, their_info=their_info)
     else:
-        cols = random.randint(10, 40)
-        rows = random.randint(10, 40)
+        #cols = random.randint(10, 40)
+        #rows = random.randint(10, 40)
         dg = DataGenerator(cols, rows)
         tiles, board = dg.gen_tiles_and_board(
         n, cols, rows, order_tiles=True, from_file=from_file)
@@ -100,7 +101,7 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     results = Result.objects.filter(
         **identifying_kwargs
     )
-    if results and from_file:
+    if results and from_file and False:
         print(f'Result already exists or is being worked on. Skipping. (results)')
         return
     else:
@@ -177,6 +178,24 @@ class Command(BaseCommand):
         parser.add_argument('--n_sim', type=int, default=10, help='number of simulations from each action')
         parser.add_argument('--from_file', action='store_true', help='use instances from file')
         parser.add_argument('--avg_depth', action='store_true', help='avg_depth')
+        parser.add_argument('--profile', action='store_true', help='Profile for performance bottlenecks')
 
     def handle(self, *args, **options):
-        run_mcts(options)
+        if options['profile']:
+            print('Calling in profile mode')
+            from pstats import SortKey
+            import cProfile, pstats, io
+            pr = cProfile.Profile()
+            pr.enable()
+            pr.runcall(run_mcts, options)
+            pr.disable()
+            s = io.StringIO()
+            sortby = SortKey.CUMULATIVE
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats()
+            print(s.getvalue())
+            #with open('profile.out', 'w') as f:
+            #    f.write(pr.dump_stats('profile.out'))
+            pr.dump_stats('profile.out')
+        else:
+            run_mcts(options)

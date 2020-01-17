@@ -8,6 +8,7 @@ import numpy as np
 import os
 import argparse
 
+
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):

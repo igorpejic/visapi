@@ -1,6 +1,7 @@
 import math
 import json
 import numpy as np
+import random
 # EPS = 1e-8
 EPS = 0.1
 
@@ -14,6 +15,9 @@ ORIENTATIONS = 2
 ALL_TILES_USED = 'ALL_TILES_USED'
 TILE_CANNOT_BE_PLACED = 'TILE_CANNOT_BE_PLACED'
 NO_NEXT_POSITION_TILES_UNUSED = 'NO_NEXT_POSITION_TILES_UNUSED'
+
+# reproducibility
+random.seed(123)
 
 
 def sort_key(x):
@@ -92,7 +96,7 @@ class State(object):
 
 
     def copy(self):
-        return State(np.copy(self.board), self.tiles[:], parent=self.parent)
+        return State(self.board, self.tiles, parent=self.parent)
 
     def child_with_biggest_score(self):
         return sorted(self.children, key=sort_key, reverse=True)[0]
@@ -154,9 +158,8 @@ def eliminate_pair_tiles(tiles, tile_to_remove):
     search through the list to find rotated instance, 
     then remove both
     '''
-    old_tiles = tiles[:]
-    index = old_tiles.index(tile_to_remove)
-    new_tiles = old_tiles[:index] + old_tiles[index + 1:]
+    index = tiles.index(tile_to_remove)
+    new_tiles = tiles[:index] + tiles[index + 1:]
 
     rotated_tile = (tile_to_remove[1], tile_to_remove[0])
     rotated_tile_index = new_tiles.index(rotated_tile)
@@ -203,8 +206,9 @@ class CustomMCTS():
         while len(state.tiles):
             tile_placed = False
             states = []
+            print(len(state.tiles))
             for i, tile in enumerate(state.tiles):
-                success, new_board = self.get_next_turn(state, tile, val)
+                success, new_board = self.get_next_turn(state, tile, val, destroy_state=False)
                 if success == ALL_TILES_USED:
                     print('solution found!')
                     solution_found = True
@@ -231,7 +235,10 @@ class CustomMCTS():
                 # no tile was placed, it's a dead end; end game
                 return initial_state, depth, solution_found
 
-            val += 1
+            # PERFORMANCE
+            # for visualization this can be changed
+            # all tiles will be 1 inside the frame for performance reasons
+            # val += 1
             depth += 1
             best_action = get_max_index(states) 
             prev_state = state
@@ -243,9 +250,11 @@ class CustomMCTS():
         solution_found = True
         return initial_state, depth, solution_found
 
-    def get_next_turn(self, state, tile, val=1):
-        new_board = np.copy(state.board)
-        next_position = SolutionChecker.get_next_lfb_on_grid(new_board)
+    def get_next_turn(self, state, tile, val=1, get_only_success=False, destroy_state=False):
+        '''
+        destroy_state - will ruin the state.board
+        '''
+        next_position = SolutionChecker.get_next_lfb_on_grid(state.board)
         # one without the other should not be possible
         if not next_position and len(state.tiles) == 0:
             print('solution found!')
@@ -253,9 +262,14 @@ class CustomMCTS():
         elif not next_position:
             return NO_NEXT_POSITION_TILES_UNUSED, None
 
+        if destroy_state:
+            board = state.board
+        else:
+            board = np.copy(state.board)
         success, new_board = SolutionChecker.place_element_on_grid_given_grid(
-            tile, SolutionChecker.get_next_lfb_on_grid(new_board),
-            val, new_board, get_cols(new_board), get_rows(new_board))
+            tile, next_position,
+            val, board, get_cols(state.board), get_rows(state.board),
+            get_only_success=get_only_success)
 
         self.n_tiles_placed += 1
 
@@ -288,9 +302,15 @@ class CustomMCTS():
     def get_valid_next_moves(self, state, tiles, val=1):
         possible_tile_moves = []
         for tile in tiles:
-            success, new_board = self.get_next_turn(
-                state, tile, val)
-            if success != TILE_CANNOT_BE_PLACED and success != NO_NEXT_POSITION_TILES_UNUSED:
+            success, _ = self.get_next_turn(
+                state, tile, val, get_only_success=True)
+            if success == TILE_CANNOT_BE_PLACED:
+                # the tiles were sorted by column size so if it does not fit it means
+                # no bigger ones will fit
+                
+                # TODO: this is not true, because height should also be taken in consideration
+                break
+            else:
                 possible_tile_moves.append(tile)
         return possible_tile_moves
 
@@ -314,9 +334,9 @@ class CustomMCTS():
             if not valid_moves:
                 return depth, simulation_root_state
 
-            next_random_tile_index = np.random.randint(len(valid_moves))
+            next_random_tile_index = random.randint(0, len(valid_moves) -1)
             success, new_board = self.get_next_turn(
-                state, valid_moves[next_random_tile_index], val)
+                state, valid_moves[next_random_tile_index], val, destroy_state=True)
 
             if success == ALL_TILES_USED:
                 # no LFB on grid; probably means grid is full
