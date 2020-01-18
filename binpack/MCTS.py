@@ -21,7 +21,6 @@ def sort_key(x):
     return x.score
 
 
-
 def get_max_index(_list):
     max_index = 0
     max_value = -math.inf
@@ -168,7 +167,7 @@ class CustomMCTS():
                 new_tiles = SolutionChecker.eliminate_pair_tiles(state.tiles, valid_moves[next_random_tile_index])
                 new_state = State(board=new_board, tiles=new_tiles, parent=state)
 
-                new_state.score = -1  #  because no simulation is performed
+                new_state.score = -1  #  because no choice is performed for sequent actions
                 state.children.append(new_state)
                 state = new_state
             depth += 1
