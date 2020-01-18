@@ -8,13 +8,10 @@ EPS = 0.1
 from collections import OrderedDict
 
 from data_generator import DataGenerator
-from solution_checker import SolutionChecker
+from state import State
+from solution_checker import SolutionChecker, ALL_TILES_USED, TILE_CANNOT_BE_PLACED, NO_NEXT_POSITION_TILES_UNUSED, get_cols, get_rows
 
 ORIENTATIONS = 2
-
-ALL_TILES_USED = 'ALL_TILES_USED'
-TILE_CANNOT_BE_PLACED = 'TILE_CANNOT_BE_PLACED'
-NO_NEXT_POSITION_TILES_UNUSED = 'NO_NEXT_POSITION_TILES_UNUSED'
 
 # reproducibility
 random.seed(123)
@@ -23,149 +20,7 @@ random.seed(123)
 def sort_key(x):
     return x.score
 
-def render_to_dict(node, tree=None, all_nodes={}, only_ids=False):
 
-    all_nodes[node.uuid_str()] = node
-    if not node.children:
-        return {}, all_nodes
-
-    if only_ids:
-        node_str = node.uuid_str()
-    else:
-        node_str = str(node)
-
-    if tree is None:
-        tree = OrderedDict([])
-
-    if node_str in tree:
-        tree = tree[node_str]
-        # all_nodes[node.uuid_str()] = node
-    else:
-        tree[node_str] = OrderedDict([])
-        tree = tree[node_str]
-    for child in node.children:
-        if only_ids:
-            child_str = child.uuid_str()
-        else:
-            child_str = str(child)
-        tree[child_str], all_nodes = render_to_dict(child, tree, all_nodes, only_ids=only_ids)
-
-    return tree, all_nodes
-
-def render_to_json(node, tree=None, i=0, all_nodes={}, only_ids=False):
-
-    node_dict = node.to_json()
-    if not node.children:
-        return node_dict
-
-    if tree is None:
-        tree = {}
-
-    i+=1
-
-    new_tree = {**node_dict}
-
-    for child in node.children:
-        new_tree['children'].append(render_to_json(child, i=i))
-
-    return new_tree
-
-class UUID(object):
-    def __init__(self):
-        self.i = 0
-
-    def uuid(self):
-        self.i += 1
-        return self.i
-
-_uuid = UUID()
-
-class State(object):
-
-    def __init__(self, board, tiles, parent=None):
-        self.board = np.copy(board)
-        self.tiles = tiles[:]
-        self.parent = parent
-        self.uuid = _uuid.uuid()
-        self.children = []
-        self.score = None
-        self.tile_placed = None
-
-    def uuid_str(self):
-      return f'{self.uuid}'
-
-
-    def copy(self):
-        return State(self.board, self.tiles, parent=self.parent)
-
-    def child_with_biggest_score(self):
-        return sorted(self.children, key=sort_key, reverse=True)[0]
-
-    def render_to_json(self):
-        return render_to_json(self)
-
-    def render_children(self, only_ids=False):
-        ret, all_nodes = render_to_dict(self, only_ids=only_ids)
-        if only_ids:
-            self_str = self.uuid_str()
-        else:
-            self_str = str(self)
-        all_nodes[self.uuid_str()] = self
-        return {self_str: ret}, all_nodes 
-
-    def to_json(self):
-        score = self.score or 0
-        board = list(self.board)
-        tiles = self.tiles
-        tile_placed = self.tile_placed
-        board = self.board.tolist()
-        ret = {
-            'tiles': tiles,
-            'board': board,
-            'tile_placed': tile_placed,
-            'score': int(score),
-            'name': self.uuid_str(),
-            'children': [],
-        }
-        return ret
-
-
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self, short=False):
-        if short:
-            return f'{self.tiles}'
-
-        output_list = [list(x) for x in self.tiles]
-        if len(output_list) > 6:
-            output_list = str(output_list[:6]) +  '(...)'
-
-        output_board = ''
-        if len(self.tiles) <= 4:
-            output_board = self.board
-        return f'({self.uuid}) Remaining tiles: {len(self.tiles) / ORIENTATIONS}, Tile placed: {self.tile_placed}. Tiles: {output_list}. Sim. depth:({self.score}) {output_board}'
-
-def get_cols(board):
-    return board.shape[1]
-
-def get_rows(board):
-    return board.shape[0]
-
-def eliminate_pair_tiles(tiles, tile_to_remove):
-    '''
-    search through the list to find rotated instance, 
-    then remove both
-    '''
-    index = tiles.index(tile_to_remove)
-    new_tiles = tiles[:index] + tiles[index + 1:]
-
-    rotated_tile = (tile_to_remove[1], tile_to_remove[0])
-    rotated_tile_index = new_tiles.index(rotated_tile)
-
-    new_tiles = new_tiles[:rotated_tile_index] + new_tiles[rotated_tile_index + 1:]
-    return new_tiles
 
 def get_max_index(_list):
     max_index = 0
@@ -208,7 +63,9 @@ class CustomMCTS():
             states = []
             print(len(state.tiles))
             for i, tile in enumerate(state.tiles):
-                success, new_board = self.get_next_turn(state, tile, val, destroy_state=False)
+                success, new_board = SolutionChecker.get_next_turn(state, tile, val, destroy_state=False)
+                self.n_tiles_placed += 1
+
                 if success == ALL_TILES_USED:
                     print('solution found!')
                     solution_found = True
@@ -219,7 +76,7 @@ class CustomMCTS():
                     continue
                 else:
                     tile_placed = True
-                    new_tiles = eliminate_pair_tiles(state.tiles, tile)
+                    new_tiles = SolutionChecker.eliminate_pair_tiles(state.tiles, tile)
                     new_state = State(
                         board=new_board, tiles=new_tiles, parent=state)
                     state.children.append(new_state)
@@ -250,33 +107,6 @@ class CustomMCTS():
         solution_found = True
         return initial_state, depth, solution_found
 
-    def get_next_turn(self, state, tile, val=1, get_only_success=False, destroy_state=False):
-        '''
-        destroy_state - will ruin the state.board
-        '''
-        next_position = SolutionChecker.get_next_lfb_on_grid(state.board)
-        # one without the other should not be possible
-        if not next_position and len(state.tiles) == 0:
-            print('solution found!')
-            return ALL_TILES_USED, None
-        elif not next_position:
-            return NO_NEXT_POSITION_TILES_UNUSED, None
-
-        if destroy_state:
-            board = state.board
-        else:
-            board = np.copy(state.board)
-        success, new_board = SolutionChecker.place_element_on_grid_given_grid(
-            tile, next_position,
-            val, board, get_cols(state.board), get_rows(state.board),
-            get_only_success=get_only_success)
-
-        self.n_tiles_placed += 1
-
-        if not success:
-            # cannot place the tile. this branch will not be considered
-            return TILE_CANNOT_BE_PLACED, None
-        return True, new_board
 
     def perform_simulations(self, state, N=3000):
         '''
@@ -299,20 +129,6 @@ class CustomMCTS():
             _max = np.average(np.array(depths))
         return _max
 
-    def get_valid_next_moves(self, state, tiles, val=1):
-        possible_tile_moves = []
-        for tile in tiles:
-            success, _ = self.get_next_turn(
-                state, tile, val, get_only_success=True)
-            if success == TILE_CANNOT_BE_PLACED:
-                # the tiles were sorted by column size so if it does not fit it means
-                # no bigger ones will fit
-                
-                # TODO: this is not true, because height should also be taken in consideration
-                break
-            else:
-                possible_tile_moves.append(tile)
-        return possible_tile_moves
 
     def perform_simulation(self, state):
         '''
@@ -330,13 +146,14 @@ class CustomMCTS():
             if len(state.tiles) == 0:
                 print('solution found in simulation')
                 return ALL_TILES_USED, simulation_root_state
-            valid_moves = self.get_valid_next_moves(state, state.tiles )
+            valid_moves = SolutionChecker.get_valid_next_moves(state, state.tiles )
             if not valid_moves:
                 return depth, simulation_root_state
 
             next_random_tile_index = random.randint(0, len(valid_moves) -1)
-            success, new_board = self.get_next_turn(
+            success, new_board = SolutionChecker.get_next_turn(
                 state, valid_moves[next_random_tile_index], val, destroy_state=True)
+            self.n_tiles_placed += 1
 
             if success == ALL_TILES_USED:
                 # no LFB on grid; probably means grid is full
@@ -348,7 +165,7 @@ class CustomMCTS():
                 # cannot place the tile. return depth reached
                 return depth, simulation_root_state
             else:
-                new_tiles = eliminate_pair_tiles(state.tiles, valid_moves[next_random_tile_index])
+                new_tiles = SolutionChecker.eliminate_pair_tiles(state.tiles, valid_moves[next_random_tile_index])
                 new_state = State(board=new_board, tiles=new_tiles, parent=state)
 
                 new_state.score = -1  #  because no simulation is performed
