@@ -123,7 +123,7 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     results = Result.objects.filter(
         **identifying_kwargs
     )
-    if results and from_file and False:
+    if results and from_file:
         print(f'Result already exists or is being worked on. Skipping. (results)')
         return
     else:
