@@ -74,11 +74,29 @@ def run_mcts(options):
         # for n_sim in [1000]:
         # for strategy in ['max_depth', 'avg_depth']:
         # strategy = 'max_depth'
-        run_one_simulation(
-            tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-        strategy=strategy, their_info=their_info,
-            problem_identifier=problem_identifier)
 
+        #run_one_simulation(
+        #    tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
+        #    strategy=strategy, their_info=their_info,
+        #    problem_identifier=problem_identifier)
+
+        # can use this code to resue problem from db
+        # res = Result.objects.filter(n_tiles=24).order_by('created_on').last()
+        # run_simulation_on_same_problem_as_result(res, strategy, n_sim, from_file, their_info, problem_identifier)
+
+def run_simulation_on_same_problem_as_result(result, strategy, n_sim, from_file, their_info, problem_identifier):
+    board = np.zeros((result.rows, result.cols))
+    tiles = tiles_to_tuples(result.tiles)
+    run_one_simulation(
+        tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
+    strategy=strategy, their_info=their_info,
+        problem_identifier=problem_identifier)
+
+def tiles_to_tuples(tiles):
+    res = []
+    for tile in tiles:
+        res.append(tuple(tile))
+    return res
 
 
 def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth', their_info=None, problem_identifier=None):
@@ -96,7 +114,7 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
         'rows': rows,
         'cols': cols,
         'n_simulations': N_simulations,
-        'tiles': tiles[:int(len(tiles)/ORIENTATIONS)],
+        'tiles': tiles,
         'problem_generator': problem_generator,
         'strategy': strategy,
         'problem_id': problem_identifier,
