@@ -13,10 +13,6 @@ from solution_checker import SolutionChecker, ALL_TILES_USED, TILE_CANNOT_BE_PLA
 
 ORIENTATIONS = 2
 
-# reproducibility
-random.seed(123)
-
-
 def sort_key(x):
     return x.score
 
@@ -34,13 +30,6 @@ def get_max_index(_list):
 
 class CustomMCTS():
     def __init__(self, tiles, board, strategy='max_depth'):
-        self.Qsa = {}       # stores Q values for s,a (as defined in the paper)
-        self.Nsa = {}       # stores #times edge s,a was visited
-        self.Ns = {}        # stores #times board s was visited
-        self.Ps = {}        # stores initial policy (returned by neural net)
-
-        self.Es = {}        # stores game.getGameEnded ended for board s
-        self.Vs = {}        # stores game.getValidMoves for board s
 
         self.initial_tiles, self.initial_board = tiles, board
         self.state = State(self.initial_board, self.initial_tiles)
@@ -91,10 +80,11 @@ class CustomMCTS():
                 # no tile was placed, it's a dead end; end game
                 return initial_state, depth, solution_found
 
-            # PERFORMANCE
+            # PERFORMANCE:
             # for visualization this can be changed
             # all tiles will be 1 inside the frame for performance reasons
             # val += 1
+
             depth += 1
             best_action = get_max_index(states) 
             prev_state = state
@@ -171,7 +161,6 @@ class CustomMCTS():
                 state.children.append(new_state)
                 state = new_state
             depth += 1
-
         return depth, simulation_root_state
 
 

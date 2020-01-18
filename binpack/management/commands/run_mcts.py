@@ -30,6 +30,7 @@ np.random.seed(123) # reproducibility
 
 ORIENTATIONS = 2
 def run_mcts(options):
+    random.seed()
     cols = options['cols']
     rows = options['rows']
     n = options['n_tiles']
@@ -64,8 +65,8 @@ def run_mcts(options):
                 tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
             strategy=strategy, their_info=their_info)
     else:
-        #cols = random.randint(10, 40)
-        #rows = random.randint(10, 40)
+        cols = random.randint(10, 40)
+        rows = random.randint(10, 40)
         dg = DataGenerator(cols, rows)
         tiles, board = dg.gen_tiles_and_board(
         n, cols, rows, order_tiles=True, from_file=from_file)
@@ -82,6 +83,8 @@ def run_mcts(options):
 
 def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth', their_info=None, problem_identifier=None):
 
+    # reproducibility
+    random.seed(123)
     n = len(tiles) / ORIENTATIONS
     N_simulations = n_sim
     problem_generator = 'florian' if from_file else 'guillotine'
@@ -96,7 +99,8 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
         'tiles': tiles[:int(len(tiles)/ORIENTATIONS)],
         'problem_generator': problem_generator,
         'strategy': strategy,
-        'problem_id': problem_identifier
+        'problem_id': problem_identifier,
+        'improved_sel': True
     }
     results = Result.objects.filter(
         **identifying_kwargs

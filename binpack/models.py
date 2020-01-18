@@ -45,6 +45,8 @@ class Result(models.Model):
 
     problem_id = models.CharField(blank=True, null=True, max_length=500)
 
+    improved_sel = models.BooleanField(default=False)
+
     class Meta:
         db_table = 'affinity'
         unique_together = (('created_on', 'problem_generator', 'rows', 'cols'),)
