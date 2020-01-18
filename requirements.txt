@@ -33,6 +33,7 @@ jupyter-client==5.3.4
 jupyter-console==6.0.0
 jupyter-core==4.6.1
 kiwisolver==1.1.0
+llvmlite==0.31.0
 Markdown==3.1.1
 MarkupPy==1.14
 MarkupSafe==1.1.1
