@@ -49,11 +49,11 @@ class Result(models.Model):
 
     class Meta:
         db_table = 'affinity'
-        unique_together = (('created_on', 'problem_generator', 'rows', 'cols'),)
+        unique_together = (('problem_generator', 'rows', 'cols', 'problem_id', 'their_id', 'improved_sel'),)
         ordering=('-created_on',)
 
     def __repr__(self):
-        return f'{self.created_on} -{len(self.tiles)} ({self.rows} x {self.cols})'
+        return f'{self.problem_generator} -{len(self.tiles)} ({self.rows} x {self.cols})'
 
     def __str__(self):
         return self.__repr__()
