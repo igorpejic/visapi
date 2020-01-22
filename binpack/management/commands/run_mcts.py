@@ -65,32 +65,39 @@ def run_mcts(options):
                 tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
             strategy=strategy, their_info=their_info)
     else:
-        cols = random.randint(10, 40)
-        rows = random.randint(10, 40)
-        dg = DataGenerator(cols, rows)
-        tiles, board = dg.gen_tiles_and_board(
-        n, cols, rows, order_tiles=True, from_file=from_file)
-        problem_identifier = uuid.uuid4()
-        # for n_sim in [1000]:
-        # for strategy in ['max_depth', 'avg_depth']:
-        # strategy = 'max_depth'
+        # for i in range(1500):
+        #     cols = random.randint(10, 40)
+        #     rows = random.randint(10, 40)
+        #     dg = DataGenerator(cols, rows)
+        #     tiles, board = dg.gen_tiles_and_board(
+        #     n, cols, rows, order_tiles=True, from_file=from_file)
+        #     problem_identifier = uuid.uuid4()
+        #     for n_sim in [1000]:
+        #         for strategy in ['max_depth', 'avg_depth']:
+        #             # strategy = 'max_depth'
+        #             run_one_simulation(
+        #                tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
+        #                strategy=strategy, their_info=their_info,
+        #                problem_identifier=problem_identifier)
 
-        #run_one_simulation(
-        #    tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-        #    strategy=strategy, their_info=their_info,
-        #    problem_identifier=problem_identifier)
+        import datetime
+        result_ids = Result.objects.filter(
+            created_on__gte=datetime.datetime(2020, 1, 18, 12), n_tiles=20, problem_generator='guillotine',
+            n_simulations=1000,
+            score__isnull=False, improved_sel=True).order_by('-created_on').values_list('problem_id', flat=True)
+        for n_sim in [2000, 100, 200]:
+            for res_id in result_ids:
+                for strategy in ['avg_depth', 'max_depth']:
+                    res = Result.objects.filter(problem_generator='guillotine', problem_id=res_id, n_simulations=1000).first()
+                    run_simulation_on_same_problem_as_result(res, strategy, n_sim, from_file, their_info)
 
-        # can use this code to resue problem from db
-        # res = Result.objects.filter(n_tiles=24).order_by('created_on').last()
-        # run_simulation_on_same_problem_as_result(res, strategy, n_sim, from_file, their_info, problem_identifier)
-
-def run_simulation_on_same_problem_as_result(result, strategy, n_sim, from_file, their_info, problem_identifier):
+def run_simulation_on_same_problem_as_result(result, strategy, n_sim, from_file, their_info):
     board = np.zeros((result.rows, result.cols))
     tiles = tiles_to_tuples(result.tiles)
     run_one_simulation(
         tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
     strategy=strategy, their_info=their_info,
-        problem_identifier=problem_identifier)
+        problem_identifier=result.problem_id)
 
 def tiles_to_tuples(tiles):
     res = []
@@ -123,7 +130,7 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     results = Result.objects.filter(
         **identifying_kwargs
     )
-    if results and from_file:
+    if results:
         print(f'Result already exists or is being worked on. Skipping. (results)')
         return
     else:
@@ -168,7 +175,7 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
         their_info = None
 
     results.update(
-        result_tree=tree_json,
+        # result_tree=tree_json,
         n_simulations=N_simulations,
         n_tiles=int(len(tiles) / ORIENTATIONS),
         solution_found=solution_found,
