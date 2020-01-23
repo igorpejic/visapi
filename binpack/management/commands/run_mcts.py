@@ -85,7 +85,7 @@ def run_mcts(options):
             created_on__gte=datetime.datetime(2020, 1, 18, 12), n_tiles=20, problem_generator='guillotine',
             n_simulations=1000,
             score__isnull=False, improved_sel=True).order_by('-created_on').values_list('problem_id', flat=True)
-        for n_sim in [2000, 100, 200]:
+        for n_sim in [200, 500]:
             for res_id in result_ids:
                 for strategy in ['avg_depth', 'max_depth']:
                     res = Result.objects.filter(problem_generator='guillotine', problem_id=res_id, n_simulations=1000).first()

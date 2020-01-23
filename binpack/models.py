@@ -40,8 +40,11 @@ class Result(models.Model):
 
     n_tiles_placed = models.IntegerField(blank=True, null=True, help_text='Number of tiles placed before a solution was found')
 
-    their_id = models.IntegerField(blank=True, null=True, help_text='ID from external dataset.')
-    their_tiles_placed = models.IntegerField(blank=True, null=True, help_text='Amount of tiles placed with heuristics algorithm')
+    their_id = models.BigIntegerField(blank=True, null=True, help_text='ID from external dataset.')
+    their_tiles_placed = models.BigIntegerField(blank=True, null=True, help_text='Amount of tiles placed with heuristics algorithm')
+
+    b_their_id = models.BigIntegerField(blank=True, null=True, help_text='ID from external dataset.')
+    b_their_tiles_placed = models.BigIntegerField(blank=True, null=True, help_text='Amount of tiles placed with heuristics algorithm')
 
     problem_id = models.CharField(blank=True, null=True, max_length=500)
 
