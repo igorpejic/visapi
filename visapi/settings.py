@@ -28,6 +28,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+import sys, os
+alpha_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'alpha')
+sys.path.append(alpha_dir)
+
 
 # Application definition
 
@@ -41,6 +45,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_extensions',
     'binpack',
+    'alpha',
     'django_json_widget',
     'corsheaders',
     'import_export',
