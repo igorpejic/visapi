@@ -32,7 +32,7 @@ docutils==0.14
 entrypoints==0.3
 et-xmlfile==1.0.1
 flake8==3.7.5
-Flask==0.10.1
+Flask==1.0
 gast==0.3.3
 google-api-python-client==1.5.5
 grpcio==1.26.0
