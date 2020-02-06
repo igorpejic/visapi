@@ -8,3 +8,17 @@ puzzles.csv
 secrets.json*
 static/
 .ipynb_checkpoints
+
+*.pyc
+alphago/.DS_Store
+
+alphago/temp/
+alphago/.project
+alphago/.pydevproject
+
+alphago/checkpoints/
+alphago/# For PyCharm users
+alphago/.idea/
+alphago/*.swp
+alphago/puzzles.csv
+alphago/results/

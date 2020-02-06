@@ -1,0 +1,16 @@
+*.pyc
+.DS_Store
+
+/temp/
+/.project
+/.pydevproject
+
+# checkpoint
+checkpoints/
+
+# For PyCharm users
+.idea/
+
+*.swp
+puzzles.csv
+results/
