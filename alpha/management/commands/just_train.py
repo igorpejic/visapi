@@ -1,9 +1,11 @@
+from django.core.management.base import BaseCommand
 from alpha.Coach import Coach
 import math
 import numpy as np
 
 from alpha.binpack.BinPackGame import BinPackGame as Game
 from utils import *
+from dotdict import dotdict
 from data_generator import DataGenerator
 from solution_checker import SolutionChecker
 import random
@@ -32,7 +34,7 @@ def gen_state(width, height, n_tiles, dg):
     get tiles and solution
     '''
 
-    tiles, solution = dg.gen_matrix_instance(N_TILES, WIDTH, HEIGHT, with_solution=True)
+    tiles, solution = dg.gen_matrix_instance(n_tiles, width, height, with_solution=True)
     board = np.zeros([1, height, width])
     state = np.concatenate((board, tiles), axis=0)
     return state, solution
@@ -57,8 +59,9 @@ def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
     zero_matrices = np.zeros([n_zero_matrices_to_add, rows, cols])
     return np.concatenate((tiles, zero_matrices), axis=0)
 
-def get_examples(N_EXAMPLES, n_tiles, height, width, dg):
+def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False):
     i = 0
+    examples = []
     while i < N_EXAMPLES:
         print(f'{i}/{N_EXAMPLES}')
         state, solution = gen_state(width, height, n_tiles, dg)
@@ -68,7 +71,7 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg):
             np.random.shuffle(randomized_solution_order)
 
             tiles = dg._transform_instance_to_matrix([x[:ORIENTATIONS] for x in randomized_solution_order[solution_index:]])
-            tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * N_TILES - len(tiles), width, height)
+            tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - len(tiles), width, height)
             pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height).flatten()
             # v = N_TILES - solution_index
             v = 1
@@ -121,6 +124,12 @@ def get_best_tile_by_prediction(grid, tiles, prediction, dg):
         print('No valid tile placement found')
     return best_tile
 
+def get_prediction_masked(prediction, valid_moves):
+    inverted_current_board = 1 - valid_moves
+    prediction = prediction * inverted_current_board
+    # renormalize
+    prediction = prediction / np.sum(prediction)
+    return prediction
 
 def play_using_prediction(nnet, width, height, n_tiles, dg):
     tiles, grid = dg.gen_tiles_and_board(n_tiles, width, height)
@@ -136,10 +145,13 @@ def play_using_prediction(nnet, width, height, n_tiles, dg):
             tiles_in_matrix_shape, n_tiles * ORIENTATIONS - tiles_left, width, height)
 
         state = np.concatenate((np.expand_dims(grid, axis=0), tiles_in_matrix_shape), axis=0)
-        prediction = nnet.predict(state)
+        prediction, v, _ = nnet.predict(state)
+
+
+        prediction = np.reshape(prediction, (width, height))
 
         # get the  probability matrix
-        prediction = np.reshape(prediction[0], (width, height))
+        prediction = get_prediction_masked(prediction, state[0])
 
         solution_tile = get_best_tile_by_prediction(grid, tiles, prediction, dg)
         if solution_tile is None:
@@ -159,8 +171,17 @@ def play_using_prediction(nnet, width, height, n_tiles, dg):
     return 0
 
 
+class Command(BaseCommand):
 
-if __name__ == "__main__":
+    help = "Run mcts"
+
+    def add_arguments(self, parser):
+        pass
+
+    def handle(self, *args, **options):
+        main()
+
+def main():
     #N_TILES = 8 
     #HEIGHT = 8
     #WIDTH = 8
@@ -171,7 +192,7 @@ if __name__ == "__main__":
 
     dg = DataGenerator(WIDTH, HEIGHT)
 
-    from binpack.tensorflow.NNet import NNetWrapper as nn
+    from alpha.binpack.tensorflow.NNet import NNetWrapper as nn
     # from binpack.keras.NNet import NNetWrapper as nn
     nnet = nn(g)
 
@@ -185,18 +206,19 @@ if __name__ == "__main__":
     grid = np.zeros([height, width])
     examples = []
     print('Preparing examples')
-    N_EXAMPLES = 800
+    N_EXAMPLES = 400
 
     _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg)
 
     nnet.train(_examples)
-    np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)})
+    np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})
 
     N_EXAMPLES = 5
-    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg)
-    for example in _examples[10:20]:
+    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True)
+    for example in _examples:
         prediction = nnet.predict(example[0])
         _prediction = np.reshape(prediction[0], (width, height))
+        _prediction = get_prediction_masked(_prediction, example[0][0])
         expected = np.reshape(example[1], (width, height))
         print('-' * 50)
         print('prediction')
@@ -211,3 +233,6 @@ if __name__ == "__main__":
         tiles_left.append(play_using_prediction(nnet, width, height, N_TILES, dg))
         # [0, 6, 4, 2, 2, 2, 0, 4, 4, 8, 6, 2, 2, 6, 6, 8, 6, 4, 4, 4]
     print(tiles_left)
+
+if __name__ == "__main__":
+    main()

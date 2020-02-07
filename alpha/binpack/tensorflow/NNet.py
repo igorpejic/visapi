@@ -6,8 +6,8 @@ import numpy as np
 import math
 import sys
 sys.path.append('../../')
-from utils import *
-from pytorch_classification.utils import Bar, AverageMeter
+from dotdict import *
+from utils import Bar, AverageMeter
 from NeuralNet import NeuralNet
 
 import tensorflow as tf
@@ -16,7 +16,7 @@ from .BinPackNNet import BinPackNNet as onnet
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.3,
-    'epochs': 1,
+    'epochs': 16,
     'batch_size': 32,
     'num_channels': 512,
 })
