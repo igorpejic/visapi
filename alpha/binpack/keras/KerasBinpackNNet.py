@@ -30,6 +30,13 @@ class KerasBinpackNNet():
         # batch_size  x board_x x board_y x num_channels
         # h_conv2 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='same', use_bias=False)(h_conv1))) 
         h_conv2 = self.residual_block(h_conv1, self.channels)
+        h_conv3 = self.residual_block(h_conv2, self.channels)
+        h_conv4 = self.residual_block(h_conv3, self.channels)
+        h_conv5 = self.residual_block(h_conv4, self.channels)
+        h_conv6 = self.residual_block(h_conv5, self.channels)
+        h_conv7 = self.residual_block(h_conv6, self.channels)
+        h_conv8 = self.residual_block(h_conv7, self.channels)
+        h_conv2 = self.residual_block(h_conv8, self.channels)
 
         h_conv3 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='valid', use_bias=False)(h_conv2)))        # batch_size  x (board_x-2) x (board_y-2) x num_channels
         h_conv4 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='valid', use_bias=False)(h_conv3)))        # batch_size  x (board_x-4) x (board_y-4) x num_channels

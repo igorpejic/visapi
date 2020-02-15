@@ -69,6 +69,12 @@ def one_hot_encode(index, state):
     b[index] = 1
     return b
 
+def get_tiles_with_orientation(tiles):
+    tiles_with_orientations = tiles[:]
+    for tile in tiles:
+        tiles_with_orientations.append((tile[1], tile[0]))
+    return tiles_with_orientations
+
 def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False, predict_move_index=True):
     examples = []
     while len(examples) < N_EXAMPLES:
@@ -82,7 +88,9 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
             solution_tile_dims = solution_tile[:2]
 
             _tiles_ints = [x[:ORIENTATIONS] for x in randomized_solution_order]
-            tiles = dg._transform_instance_to_matrix(_tiles_ints)
+            _tiles_ints = get_tiles_with_orientation(_tiles_ints)
+            np.random.shuffle(_tiles_ints)
+            tiles = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
             tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
             pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height, return_binary_mask=False).flatten()
             state = np.dstack((np.expand_dims(grid, axis=2), tiles))
@@ -94,7 +102,7 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
             if predict_move_index:
                 _tiles_ints = [list(x) for x in _tiles_ints]
                 if _tiles_ints.count(solution_tile_dims) == 1:
-                    solution_index = _tiles_ints.index(solution_tile_dims) * ORIENTATIONS
+                    solution_index = _tiles_ints.index(solution_tile_dims)
                     example = [state, one_hot_encode(solution_index, state)]
                     examples.append(example)
                 else:
@@ -113,7 +121,7 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
 
     return examples
 
-def get_best_tile_by_prediction(grid, tiles, prediction, dg):
+def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=True):
     '''
     1. mask invalid moves
     2. renormalize the probability distribution
@@ -135,9 +143,12 @@ def get_best_tile_by_prediction(grid, tiles, prediction, dg):
         if not success:
             continue
 
-        probability = np.sum(
-            prediction[next_lfb[0]: next_lfb[0] + tile[0], next_lfb[1]: next_lfb[1] + tile[1]]
-        )
+        if predict_move_index:
+            probability = prediction[i]
+        else:
+            probability = np.sum(
+                prediction[next_lfb[0]: next_lfb[0] + tile[0], next_lfb[1]: next_lfb[1] + tile[1]]
+            )
 
         # scale with area
         # probability = probability / (tile[0] * tile[1])
@@ -172,24 +183,20 @@ def play_using_prediction(nnet, width, height, n_tiles, dg, predict_move_index=F
 
         state = np.dstack((np.expand_dims(grid, axis=2), tiles_in_matrix_shape))
         prediction = nnet.predict(state)
-        if predict_move_index:
-            prediction = np.argmax(prediction)
-            solution_tile = dg.get_matrix_tile_dims(state[:, :, prediction+1])
-            print(solution_tile)
-        else:
+
+        if not predict_move_index:
             if len(prediction) == 2:
                 prediction, v = prediction
-
 
             prediction = np.reshape(prediction, (width, height))
 
             # get the  probability matrix
             prediction = get_prediction_masked(prediction, state[:, :, 0])
 
-            solution_tile = get_best_tile_by_prediction(grid, tiles, prediction, dg)
-            if solution_tile is None:
-                print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
-                return tiles_left / ORIENTATIONS
+        solution_tile = get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=predict_move_index)
+        if solution_tile is None:
+            print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
+            return tiles_left / ORIENTATIONS
 
         success, grid = SolutionChecker.place_element_on_grid_given_grid(
             solution_tile[0], solution_tile[1], val=1, grid=grid, cols=width,
