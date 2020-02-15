@@ -17,18 +17,19 @@ from .KerasBinpackNNet import KerasBinpackNNet as onnet
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.3,
-    'epochs': 15,
+    'epochs': 30,
     'batch_size': 64,
     'cuda': False,
     'num_channels': 512,
 })
 
 class NNetWrapper(NeuralNet):
-    def __init__(self, game):
-        self.nnet = onnet(game, args)
+    def __init__(self, game, predict_move_index=True):
+        self.nnet = onnet(game, args, predict_move_index=predict_move_index)
         self.board_x, self.board_y, self.channels = game.getBoardSize()
         self.action_size = game.getActionSize()
         self.predict_v = False
+        self.predict_move_index = predict_move_index
 
     def train(self, examples):
         """

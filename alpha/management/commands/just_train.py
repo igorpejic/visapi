@@ -63,15 +63,21 @@ def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
     zero_matrices = np.zeros([rows, cols, n_zero_matrices_to_add])
     return np.dstack((tiles, zero_matrices))
 
-def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False, predict_move_index=False):
-    i = 0
+def one_hot_encode(index, state):
+    _n_actions = state.shape[2]  - 1
+    b = np.zeros((_n_actions))
+    b[index] = 1
+    return b
+
+def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False, predict_move_index=True):
     examples = []
-    while i < N_EXAMPLES:
-        print(f'{i}/{N_EXAMPLES}')
+    while len(examples) < N_EXAMPLES:
+        print(f'{len(examples)}/{N_EXAMPLES}')
         state, solution = gen_state(width, height, n_tiles, dg)
         grid = np.zeros([height, width])
         for solution_index, solution_tile in enumerate(solution):
-            randomized_solution_order = np.array(solution[solution_index:])
+            solution_copy = np.copy(solution)
+            randomized_solution_order = np.array(solution_copy[solution_index:])
             np.random.shuffle(randomized_solution_order)
             solution_tile_dims = solution_tile[:2]
 
@@ -79,25 +85,32 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
             tiles = dg._transform_instance_to_matrix(_tiles_ints)
             tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
             pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height, return_binary_mask=False).flatten()
+            state = np.dstack((np.expand_dims(grid, axis=2), tiles))
             # v = N_TILES - solution_index
             v = 1
             if solution_index == len(solution) - 1 :
                 continue
 
             if predict_move_index:
-                example = [state]
+                _tiles_ints = [list(x) for x in _tiles_ints]
+                if _tiles_ints.count(solution_tile_dims) == 1:
+                    solution_index = _tiles_ints.index(solution_tile_dims) * ORIENTATIONS
+                    example = [state, one_hot_encode(solution_index, state)]
+                    examples.append(example)
+                else:
+                    # skip squares and duplicates during training
+                    pass
             else:
-                state = np.dstack((np.expand_dims(grid, axis=2), tiles))
                 example = [state, pi]
                 if predict_v:
                     example.append(v)
+
                 examples.append(example)
 
             success, grid = SolutionChecker.place_element_on_grid_given_grid(
                 solution_tile[:ORIENTATIONS], solution_tile[2], val=1, grid=grid, cols=width, rows=height
             )
 
-        i += 1
     return examples
 
 def get_best_tile_by_prediction(grid, tiles, prediction, dg):
@@ -144,7 +157,7 @@ def get_prediction_masked(prediction, valid_moves):
     prediction = prediction / np.sum(prediction)
     return prediction
 
-def play_using_prediction(nnet, width, height, n_tiles, dg):
+def play_using_prediction(nnet, width, height, n_tiles, dg, predict_move_index=False):
     tiles, grid = dg.gen_tiles_and_board(n_tiles, width, height)
 
     while True:
@@ -159,19 +172,24 @@ def play_using_prediction(nnet, width, height, n_tiles, dg):
 
         state = np.dstack((np.expand_dims(grid, axis=2), tiles_in_matrix_shape))
         prediction = nnet.predict(state)
-        if len(prediction) == 2:
-            prediction, v = prediction
+        if predict_move_index:
+            prediction = np.argmax(prediction)
+            solution_tile = dg.get_matrix_tile_dims(state[:, :, prediction+1])
+            print(solution_tile)
+        else:
+            if len(prediction) == 2:
+                prediction, v = prediction
 
 
-        prediction = np.reshape(prediction, (width, height))
+            prediction = np.reshape(prediction, (width, height))
 
-        # get the  probability matrix
-        prediction = get_prediction_masked(prediction, state[:, :, 0])
+            # get the  probability matrix
+            prediction = get_prediction_masked(prediction, state[:, :, 0])
 
-        solution_tile = get_best_tile_by_prediction(grid, tiles, prediction, dg)
-        if solution_tile is None:
-            print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
-            return tiles_left / ORIENTATIONS
+            solution_tile = get_best_tile_by_prediction(grid, tiles, prediction, dg)
+            if solution_tile is None:
+                print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
+                return tiles_left / ORIENTATIONS
 
         success, grid = SolutionChecker.place_element_on_grid_given_grid(
             solution_tile[0], solution_tile[1], val=1, grid=grid, cols=width,
@@ -200,6 +218,7 @@ def main():
     #N_TILES = 8 
     #HEIGHT = 8
     #WIDTH = 8
+    predict_move_index = True
     N_TILES = 20 
     HEIGHT = 10
     WIDTH = 10
@@ -221,32 +240,45 @@ def main():
     grid = np.zeros([height, width])
     examples = []
     print('Preparing examples')
-    N_EXAMPLES = 800
+    N_EXAMPLES = 8000
 
-    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, return_binary_mask=True)
+    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, return_binary_mask=True, predict_move_index=True)
 
-    print(_examples[0][0].shape)
     nnet.train(_examples)
     np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})
 
-    N_EXAMPLES = 2
-    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True, return_binary_mask=True)
+    N_EXAMPLES = 3
+    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True, return_binary_mask=True, predict_move_index=True)
     for example in _examples:
         prediction = nnet.predict(example[0])
-        _prediction = np.reshape(prediction, (width, height))
-        _prediction = get_prediction_masked(_prediction, example[0][:, :, 0])
-        expected = np.reshape(example[1], (width, height))
-        print('-' * 50)
-        print('grid state')
-        print(example[0][:, :, 0])
-        print('expected')
-        print(expected)
-        print('prediction')
-        print(_prediction)
+        if predict_move_index:
+            _prediction = prediction
+            max_index = np.argmax(prediction)
+            _prediction = max_index
+            expected = np.argmax(example[1])
+
+            print('-' * 50)
+            print('grid state')
+            print(example[0][:, :, 0])
+            print('expected')
+            print(expected, dg.get_matrix_tile_dims(example[0][:, :, expected + 1]))
+            print('prediction')
+            print(_prediction, dg.get_matrix_tile_dims(example[0][:, :, _prediction + 1]))
+        else:
+            _prediction = np.reshape(prediction, (width, height))
+            _prediction = get_prediction_masked(_prediction, example[0][:, :, 0])
+            expected = np.reshape(example[1], (width, height))
+            print('-' * 50)
+            print('grid state')
+            print(example[0][:, :, 0])
+            print('expected')
+            print(expected)
+            print('prediction')
+            print(_prediction)
 
     tiles_left = []
     for i in range(20):
-        tiles_left.append(play_using_prediction(nnet, width, height, N_TILES, dg))
+        tiles_left.append(play_using_prediction(nnet, width, height, N_TILES, dg, predict_move_index))
         # [0, 6, 4, 2, 2, 2, 0, 4, 4, 8, 6, 2, 2, 6, 6, 8, 6, 4, 4, 4]
     print(tiles_left)
 

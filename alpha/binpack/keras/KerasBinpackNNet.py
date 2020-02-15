@@ -9,7 +9,7 @@ from keras import layers
 from keras.optimizers import *
 
 class KerasBinpackNNet():
-    def __init__(self, game, args):
+    def __init__(self, game, args, predict_move_index=True):
         # game params
         self.board_x, self.board_y, self.channels = game.getBoardSize()
         self.action_size = game.getActionSize()
@@ -36,14 +36,23 @@ class KerasBinpackNNet():
         h_conv4_flat = Flatten()(h_conv4)       
         s_fc1 = Dropout(args.dropout)(Activation('relu')(BatchNormalization(axis=1)(Dense(1024, use_bias=False)(h_conv4_flat))))  # batch_size x 1024
         s_fc2 = Dropout(args.dropout)(Activation('relu')(BatchNormalization(axis=1)(Dense(512, use_bias=False)(s_fc1))))          # batch_size x 1024
-        self.pi = Dense(self.action_size, activation='softmax', name='pi')(s_fc2)   # batch_size x self.action_size
+
+        if predict_move_index:
+            # channels - 1 for state
+            self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(s_fc2)
+
+        else:
+            self.pi = Dense(self.action_size, activation='softmax', name='pi')(s_fc2)   # batch_size x self.action_size
         self.v = Dense(1, activation='tanh', name='v')(s_fc2)                    # batch_size x 1
 
         # 2 losses
         # self.model = Model(inputs=self.input_boards, outputs=[self.pi, self.v])
         # self.model.compile(loss=['categorical_crossentropy','mean_squared_error'], optimizer=Adam(args.lr))
         self.model = Model(inputs=self.input_boards, outputs=[self.pi])
-        self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
+        if predict_move_index:
+            self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['accuracy'])
+        else:
+            self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
 
     def residual_block(self, y, nb_channels, _strides=(1, 1), _project_shortcut=False):
         shortcut = y
