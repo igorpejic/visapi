@@ -215,7 +215,7 @@ def main():
     grid = np.zeros([height, width])
     examples = []
     print('Preparing examples')
-    N_EXAMPLES = 8
+    N_EXAMPLES = 800
 
     _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, return_binary_mask=True)
 
@@ -224,7 +224,7 @@ def main():
     np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})
 
     N_EXAMPLES = 2
-    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True)
+    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True, return_binary_mask=True)
     for example in _examples:
         prediction = nnet.predict(example[0])
         _prediction = np.reshape(prediction, (width, height))
