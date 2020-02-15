@@ -17,7 +17,7 @@ from .KerasBinpackNNet import KerasBinpackNNet as onnet
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.3,
-    'epochs': 30,
+    'epochs': 25,
     'batch_size': 64,
     'cuda': False,
     'num_channels': 512,

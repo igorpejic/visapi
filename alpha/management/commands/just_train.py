@@ -9,6 +9,7 @@ from dotdict import dotdict
 from data_generator import DataGenerator
 from solution_checker import SolutionChecker
 import random
+from collections import defaultdict
 
 ORIENTATIONS = 2
 
@@ -63,10 +64,12 @@ def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
     zero_matrices = np.zeros([rows, cols, n_zero_matrices_to_add])
     return np.dstack((tiles, zero_matrices))
 
-def one_hot_encode(index, state):
-    _n_actions = state.shape[2]  - 1
+def one_hot_encode(tiles_ints, solution_tile, state):
+    _n_actions = state.shape[2] - 1
     b = np.zeros((_n_actions))
-    b[index] = 1
+    for i, tile in enumerate(tiles_ints):
+        if tile == solution_tile:
+            b[i] = 1
     return b
 
 def get_tiles_with_orientation(tiles):
@@ -101,10 +104,11 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
 
             if predict_move_index:
                 _tiles_ints = [list(x) for x in _tiles_ints]
-                if _tiles_ints.count(solution_tile_dims) == 1:
+                if _tiles_ints.count(solution_tile_dims) == 1 or True:
                     solution_index = _tiles_ints.index(solution_tile_dims)
-                    example = [state, one_hot_encode(solution_index, state)]
+                    example = [state, one_hot_encode(_tiles_ints, solution_tile_dims, state)]
                     examples.append(example)
+                    # print(_tiles_ints, solution_tile_dims, one_hot_encode(_tiles_ints, solution_tile_dims, state))
                 else:
                     # skip squares and duplicates during training
                     pass
@@ -121,7 +125,7 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
 
     return examples
 
-def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=True):
+def get_best_tile_by_prediction(grid, original_tiles, tiles, prediction, dg, predict_move_index=True):
     '''
     1. mask invalid moves
     2. renormalize the probability distribution
@@ -135,7 +139,15 @@ def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=
     max_probability = -math.inf
     max_index = 0
     best_tile = None
-    for i, tile in enumerate(tiles):
+
+    tile_probabilities = defaultdict(int)
+    tile_counts = defaultdict(int)
+    if predict_move_index:
+        tiles_to_iterate_on = original_tiles
+    else:
+        tiles_to_iterate_on = tiles
+
+    for i, tile in enumerate(tiles_to_iterate_on):
         success, _ = SolutionChecker.place_element_on_grid_given_grid(
             tile, next_lfb,
             val=1, grid=grid, cols=cols, rows=rows, get_only_success=True
@@ -144,19 +156,45 @@ def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=
             continue
 
         if predict_move_index:
-            probability = prediction[i]
+            '''
+            The best tile is predicted by taking the sum of the tiles
+            with the same (width, height)
+            '''
+            if tile not in tiles: # if it is not in the possible tiles, do not put in the dict
+                continue
+            tile_probabilities[tile] += prediction[i]
+            tile_counts[tile] += 1
         else:
             probability = np.sum(
                 prediction[next_lfb[0]: next_lfb[0] + tile[0], next_lfb[1]: next_lfb[1] + tile[1]]
             )
 
-        # scale with area
-        # probability = probability / (tile[0] * tile[1])
+            # scale with area
+            # probability = probability / (tile[0] * tile[1])
 
-        if probability > max_probability:
-            max_index = i
-            max_probability = probability
-            best_tile = [tile, next_lfb]
+            if probability > max_probability:
+                max_index = i
+                max_probability = probability
+                best_tile = [tile, next_lfb]
+
+    if predict_move_index:
+        max_tile = None
+        max_val = -math.inf
+        for k in tile_probabilities.keys():
+            v = tile_probabilities[k] / tile_counts[k]
+            if len(original_tiles) - len(tiles) > 3:
+                if v > max_val:
+                    max_tile = k
+                    max_val = v
+            else:
+                if k[0] * k[1] > max_val:
+                    max_tile = k
+                    max_val = k[0] * k[1]
+        if max_tile:
+            best_tile = [max_tile, next_lfb]
+
+    # print(tile_probabilities)
+    # print(tile_counts)
     if not best_tile:
         print('No valid tile placement found')
     return best_tile
@@ -169,7 +207,8 @@ def get_prediction_masked(prediction, valid_moves):
     return prediction
 
 def play_using_prediction(nnet, width, height, n_tiles, dg, predict_move_index=False):
-    tiles, grid = dg.gen_tiles_and_board(n_tiles, width, height)
+    tiles, grid = dg.gen_tiles_and_board(n_tiles, width, height, from_file=False)
+    original_tiles = tiles[:]
 
     while True:
         tiles_left = len(tiles)
@@ -193,7 +232,10 @@ def play_using_prediction(nnet, width, height, n_tiles, dg, predict_move_index=F
             # get the  probability matrix
             prediction = get_prediction_masked(prediction, state[:, :, 0])
 
-        solution_tile = get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=predict_move_index)
+        # print('-' * 50)
+        # print(grid, prediction, original_tiles)
+        # print(tiles)
+        solution_tile = get_best_tile_by_prediction(grid, original_tiles, tiles, prediction, dg, predict_move_index=predict_move_index)
         if solution_tile is None:
             print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
             return tiles_left / ORIENTATIONS
@@ -227,8 +269,8 @@ def main():
     #WIDTH = 8
     predict_move_index = True
     N_TILES = 20 
-    HEIGHT = 10
-    WIDTH = 10
+    HEIGHT = 20
+    WIDTH = 20
     g = Game(HEIGHT, WIDTH, N_TILES)
 
     dg = DataGenerator(WIDTH, HEIGHT)
@@ -254,8 +296,8 @@ def main():
     nnet.train(_examples)
     np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})
 
-    N_EXAMPLES = 3
-    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True, return_binary_mask=True, predict_move_index=True)
+    N_EXAMPLES = 8
+    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True)
     for example in _examples:
         prediction = nnet.predict(example[0])
         if predict_move_index:
