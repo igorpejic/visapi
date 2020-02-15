@@ -63,7 +63,7 @@ def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
     zero_matrices = np.zeros([rows, cols, n_zero_matrices_to_add])
     return np.dstack((tiles, zero_matrices))
 
-def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False):
+def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False, predict_move_index=False):
     i = 0
     examples = []
     while i < N_EXAMPLES:
@@ -71,21 +71,27 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
         state, solution = gen_state(width, height, n_tiles, dg)
         grid = np.zeros([height, width])
         for solution_index, solution_tile in enumerate(solution):
-            randomized_solution_order = np.array(solution)
+            randomized_solution_order = np.array(solution[solution_index:])
             np.random.shuffle(randomized_solution_order)
+            solution_tile_dims = solution_tile[:2]
 
-            tiles = dg._transform_instance_to_matrix([x[:ORIENTATIONS] for x in randomized_solution_order[solution_index:]])
+            _tiles_ints = [x[:ORIENTATIONS] for x in randomized_solution_order]
+            tiles = dg._transform_instance_to_matrix(_tiles_ints)
             tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
             pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height, return_binary_mask=False).flatten()
             # v = N_TILES - solution_index
             v = 1
             if solution_index == len(solution) - 1 :
                 continue
-            state = np.dstack((np.expand_dims(grid, axis=2), tiles))
-            example = [state, pi]
-            if predict_v:
-                example.append(v)
-            examples.append(example)
+
+            if predict_move_index:
+                example = [state]
+            else:
+                state = np.dstack((np.expand_dims(grid, axis=2), tiles))
+                example = [state, pi]
+                if predict_v:
+                    example.append(v)
+                examples.append(example)
 
             success, grid = SolutionChecker.place_element_on_grid_given_grid(
                 solution_tile[:ORIENTATIONS], solution_tile[2], val=1, grid=grid, cols=width, rows=height
