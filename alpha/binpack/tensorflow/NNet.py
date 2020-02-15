@@ -16,7 +16,7 @@ from .BinPackNNet import BinPackNNet as onnet
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.3,
-    'epochs': 16,
+    'epochs': 200,
     'batch_size': 32,
     'num_channels': 512,
 })

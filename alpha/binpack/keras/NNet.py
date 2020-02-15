@@ -5,6 +5,7 @@ import time
 import random
 import numpy as np
 import math
+from dotdict import *
 import sys
 sys.path.append('../..')
 from utils import *
@@ -27,16 +28,28 @@ class NNetWrapper(NeuralNet):
         self.nnet = onnet(game, args)
         self.board_x, self.board_y, self.channels = game.getBoardSize()
         self.action_size = game.getActionSize()
+        self.predict_v = False
 
     def train(self, examples):
         """
         examples: list of examples, each example is of form (board, pi, v)
         """
-        input_boards, target_pis, target_vs = list(zip(*examples))
+        if self.predict_v:
+            input_boards, target_pis, target_vs = list(zip(*examples))
+        else:
+            input_boards, target_pis = list(zip(*examples))
         input_boards = np.asarray(input_boards)
         target_pis = np.asarray(target_pis)
-        target_vs = np.asarray(target_vs)
-        self.nnet.model.fit(x = input_boards, y = [target_pis, target_vs], batch_size = args.batch_size, epochs = args.epochs)
+        y = [target_pis]
+        if self.predict_v:
+            target_vs = np.asarray(target_vs)
+            y = [target_pis, target_vs]
+
+        print(self.nnet.model.summary())
+        self.nnet.model.fit(
+            x=input_boards, y=y, batch_size=args.batch_size, epochs=args.epochs,
+            validation_split=0.2
+        )
 
     def predict(self, board):
         """
@@ -49,10 +62,14 @@ class NNetWrapper(NeuralNet):
         board = board[np.newaxis, :, :]
 
         # run
-        pi, v = self.nnet.model.predict(board)
+        if self.predict_v:
+            pi, v = self.nnet.model.predict(board)
+            return pi[0], v[0]
+        else:
+            pi = self.nnet.model.predict(board)
+            return pi[0]
 
         #print('PREDICTION TIME TAKEN : {0:03f}'.format(time.time()-start))
-        return pi[0], v[0]
 
     def save_checkpoint(self, folder='checkpoint', filename='checkpoint.pth.tar'):
         filepath = os.path.join(folder, filename)

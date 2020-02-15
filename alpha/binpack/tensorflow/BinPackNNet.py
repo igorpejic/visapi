@@ -55,7 +55,9 @@ class BinPackNNet():
             s_fc2 = Dropout(Relu(BatchNormalization(Dense(s_fc1, 512), axis=1, training=self.isTraining)), rate=self.dropout)
             # batch_size x self.action_size
             self.pi = Dense(s_fc2, self.action_size)
+
             self.prob = tf.nn.softmax(self.pi)
+
             # batch_size x 1
             self.v = tf.nn.sigmoid(Dense(s_fc2, 1))
 

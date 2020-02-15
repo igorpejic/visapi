@@ -39,7 +39,7 @@ def gen_state(width, height, n_tiles, dg):
     state = np.concatenate((board, tiles), axis=0)
     return state, solution
 
-def solution_to_solution_matrix(solution, rows, cols):
+def solution_to_solution_matrix(solution, rows, cols, return_binary_mask=False):
     '''
     transform solution to 2D matrix with 1 only there where the correct tile should be placed, -1 elsewhere
     This is the expected output of the residual network
@@ -48,7 +48,11 @@ def solution_to_solution_matrix(solution, rows, cols):
     grid *= 0
     position = solution[2]
     number_of_ones = solution[0] * solution[1]
-    grid[position[0]: position[0] + solution[0], position[1]: position[1] + solution[1]] = 1 / number_of_ones
+    grid[position[0]: position[0] + solution[0], position[1]: position[1] + solution[1]] = 1
+    if not return_binary_mask:
+        grid[position[0]: position[0] + solution[0], position[1]: position[1] + solution[1]] = 1 / number_of_ones
+
+    
     return grid
 
 def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
@@ -59,7 +63,7 @@ def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
     zero_matrices = np.zeros([n_zero_matrices_to_add, rows, cols])
     return np.concatenate((tiles, zero_matrices), axis=0)
 
-def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False):
+def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False):
     i = 0
     examples = []
     while i < N_EXAMPLES:
@@ -72,13 +76,16 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False):
 
             tiles = dg._transform_instance_to_matrix([x[:ORIENTATIONS] for x in randomized_solution_order[solution_index:]])
             tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - len(tiles), width, height)
-            pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height).flatten()
+            pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height, return_binary_mask=False).flatten()
             # v = N_TILES - solution_index
             v = 1
             if solution_index == len(solution) - 1 :
                 continue
             state = np.concatenate((np.expand_dims(grid, axis=0), tiles), axis=0)
-            examples.append([state, pi, v])
+            example = [state, pi]
+            if predict_v:
+                example.append(v)
+            examples.append(example)
 
             success, grid = SolutionChecker.place_element_on_grid_given_grid(
                 solution_tile[:ORIENTATIONS], solution_tile[2], val=1, grid=grid, cols=width, rows=height
@@ -145,7 +152,9 @@ def play_using_prediction(nnet, width, height, n_tiles, dg):
             tiles_in_matrix_shape, n_tiles * ORIENTATIONS - tiles_left, width, height)
 
         state = np.concatenate((np.expand_dims(grid, axis=0), tiles_in_matrix_shape), axis=0)
-        prediction, v, _ = nnet.predict(state)
+        prediction = nnet.predict(state)
+        if len(prediction) == 2:
+            prediction, v = prediction
 
 
         prediction = np.reshape(prediction, (width, height))
@@ -192,8 +201,8 @@ def main():
 
     dg = DataGenerator(WIDTH, HEIGHT)
 
-    from alpha.binpack.tensorflow.NNet import NNetWrapper as nn
-    # from binpack.keras.NNet import NNetWrapper as nn
+    # from alpha.binpack.tensorflow.NNet import NNetWrapper as nn
+    from alpha.binpack.keras.NNet import NNetWrapper as nn
     nnet = nn(g)
 
     if args.load_model and False:
@@ -206,27 +215,27 @@ def main():
     grid = np.zeros([height, width])
     examples = []
     print('Preparing examples')
-    N_EXAMPLES = 400
+    N_EXAMPLES = 800
 
-    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg)
+    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, return_binary_mask=True)
 
     nnet.train(_examples)
     np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})
 
-    N_EXAMPLES = 5
+    N_EXAMPLES = 2
     _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True)
     for example in _examples:
         prediction = nnet.predict(example[0])
-        _prediction = np.reshape(prediction[0], (width, height))
+        _prediction = np.reshape(prediction, (width, height))
         _prediction = get_prediction_masked(_prediction, example[0][0])
         expected = np.reshape(example[1], (width, height))
         print('-' * 50)
-        print('prediction')
-        print(_prediction)
-        print('expected')
-        print(expected)
         print('grid state')
         print(example[0][0])
+        print('expected')
+        print(expected)
+        print('prediction')
+        print(_prediction)
 
     tiles_left = []
     for i in range(20):
