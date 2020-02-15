@@ -35,8 +35,8 @@ def gen_state(width, height, n_tiles, dg):
     '''
 
     tiles, solution = dg.gen_matrix_instance(n_tiles, width, height, with_solution=True)
-    board = np.zeros([1, height, width])
-    state = np.concatenate((board, tiles), axis=0)
+    board = np.zeros([height, width, 1])
+    state = np.dstack((board, tiles))
     return state, solution
 
 def solution_to_solution_matrix(solution, rows, cols, return_binary_mask=False):
@@ -60,8 +60,8 @@ def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
     add tiles with zero matrices to compensate for tiles which were already placed
     '''
 
-    zero_matrices = np.zeros([n_zero_matrices_to_add, rows, cols])
-    return np.concatenate((tiles, zero_matrices), axis=0)
+    zero_matrices = np.zeros([rows, cols, n_zero_matrices_to_add])
+    return np.dstack((tiles, zero_matrices))
 
 def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False):
     i = 0
@@ -75,13 +75,13 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
             np.random.shuffle(randomized_solution_order)
 
             tiles = dg._transform_instance_to_matrix([x[:ORIENTATIONS] for x in randomized_solution_order[solution_index:]])
-            tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - len(tiles), width, height)
+            tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
             pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height, return_binary_mask=False).flatten()
             # v = N_TILES - solution_index
             v = 1
             if solution_index == len(solution) - 1 :
                 continue
-            state = np.concatenate((np.expand_dims(grid, axis=0), tiles), axis=0)
+            state = np.dstack((np.expand_dims(grid, axis=2), tiles))
             example = [state, pi]
             if predict_v:
                 example.append(v)
@@ -151,7 +151,7 @@ def play_using_prediction(nnet, width, height, n_tiles, dg):
         tiles_in_matrix_shape = pad_tiles_with_zero_matrices(
             tiles_in_matrix_shape, n_tiles * ORIENTATIONS - tiles_left, width, height)
 
-        state = np.concatenate((np.expand_dims(grid, axis=0), tiles_in_matrix_shape), axis=0)
+        state = np.dstack((np.expand_dims(grid, axis=2), tiles_in_matrix_shape))
         prediction = nnet.predict(state)
         if len(prediction) == 2:
             prediction, v = prediction
@@ -160,7 +160,7 @@ def play_using_prediction(nnet, width, height, n_tiles, dg):
         prediction = np.reshape(prediction, (width, height))
 
         # get the  probability matrix
-        prediction = get_prediction_masked(prediction, state[0])
+        prediction = get_prediction_masked(prediction, state[:, :, 0])
 
         solution_tile = get_best_tile_by_prediction(grid, tiles, prediction, dg)
         if solution_tile is None:
@@ -215,10 +215,11 @@ def main():
     grid = np.zeros([height, width])
     examples = []
     print('Preparing examples')
-    N_EXAMPLES = 800
+    N_EXAMPLES = 8
 
     _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, return_binary_mask=True)
 
+    print(_examples[0][0].shape)
     nnet.train(_examples)
     np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})
 
@@ -227,11 +228,11 @@ def main():
     for example in _examples:
         prediction = nnet.predict(example[0])
         _prediction = np.reshape(prediction, (width, height))
-        _prediction = get_prediction_masked(_prediction, example[0][0])
+        _prediction = get_prediction_masked(_prediction, example[0][:, :, 0])
         expected = np.reshape(example[1], (width, height))
         print('-' * 50)
         print('grid state')
-        print(example[0][0])
+        print(example[0][:, :, 0])
         print('expected')
         print(expected)
         print('prediction')

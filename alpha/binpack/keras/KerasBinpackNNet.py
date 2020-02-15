@@ -17,7 +17,7 @@ class KerasBinpackNNet():
 
         # Neural Net
         # s: batch_size x board_x x board_y
-        self.input_boards = Input(shape=(self.channels, self.board_x, self.board_y))
+        self.input_boards = Input(shape=(self.board_x, self.board_y, self.channels))
 
         # batch_size  x board_x x board_y x 1
         # x_image = Reshape((self.channels, self.board_x, self.board_y, 1))(self.input_boards)

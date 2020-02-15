@@ -30,13 +30,13 @@ class Board():
 
 
         if state is None:
-            board = np.zeros([1, self.height, self.width])
-            self.state = np.concatenate((board, self.tiles), axis=0)
+            board = np.zeros([self.height, self.width, 1])
+            self.state = np.dstack((board, self.tiles))
             self.vis_state = np.zeros([self.height, self.width])
         else:
             self.state = state
             self.vis_state = visualization_state
-        assert self.state.shape == (len(tiles) + 1, self.height, self.width)
+        assert self.state.shape == (self.height, self.width, tiles.shape[2] + 1)
 
     def add_tile(self, position, player):
         """
