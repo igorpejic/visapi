@@ -211,8 +211,6 @@ def state_to_tiles_dims(state, dg):
 
 
 def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict_move_index=False):
-    original_tiles = tiles[:]
-
     while True:
         tiles_left = len(tiles)
         if tiles_left == 0:
@@ -227,7 +225,7 @@ def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict
         prediction = nnet.predict(state)
 
         if not predict_move_index:
-            if len(prediction) == 2:
+            if len(prediction) == 2: # if we are also predicting v
                 prediction, v = prediction
 
             prediction = np.reshape(prediction, (width, height))
@@ -236,9 +234,11 @@ def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict
             prediction = get_prediction_masked(prediction, state[:, :, 0])
 
         # print('-' * 50)
-        # print(grid, prediction, original_tiles)
+        # print(grid, prediction)
         # print(tiles)
-        solution_tile = get_best_tile_by_prediction(grid, state_to_tiles_dims(state, dg), prediction, dg, predict_move_index=predict_move_index)
+        solution_tile = get_best_tile_by_prediction(
+            grid, state_to_tiles_dims(state, dg), prediction, dg, predict_move_index=predict_move_index)
+        # print(solution_tile)
         if solution_tile is None:
             print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
             return tiles_left / ORIENTATIONS
@@ -266,14 +266,17 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         main(options)
 
+def count_n_of_non_placed_tiles(tiles):
+    return len([tile for tile in tiles if tile != (0, 0)])
+
 def main(options):
     #N_TILES = 8 
     #HEIGHT = 8
     #WIDTH = 8
     predict_move_index = True
-    N_TILES = 20 
-    HEIGHT = 20
-    WIDTH = 20
+    N_TILES = 15 
+    HEIGHT = 12
+    WIDTH = 12
     g = Game(HEIGHT, WIDTH, N_TILES)
 
     dg = DataGenerator(WIDTH, HEIGHT)
@@ -297,27 +300,36 @@ def main(options):
 
     np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})
 
-    N_EXAMPLES = 80
-    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True)
+    N_EXAMPLES = 200
+    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True, return_binary_mask=True, predict_move_index=True)
     total_correct = 0
     total_count = 0
+    
+    n_empty_tiles_with_fails = [0] * (N_TILES + 1)
     for example in _examples:
         prediction = nnet.predict(example[0])
         if predict_move_index:
             _prediction = prediction
             max_index = np.argmax(prediction)
-            _prediction = max_index
+            _prediction_index = max_index
             expected = np.argmax(example[1])
 
             print('-' * 50)
-            # print('grid state')
-            # print(example[0][:, :, 0])
+            print('grid state')
+            print(example[0][:, :, 0])
+            print(state_to_tiles_dims(example[0], dg))
             print('expected')
-            print(expected, dg.get_matrix_tile_dims(example[0][:, :, expected + 1]))
+            print(example[1])
+            expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
+            print(expected, expected_tile)
             print('prediction')
-            print(_prediction, dg.get_matrix_tile_dims(example[0][:, :, _prediction + 1]))
-            if expected == _prediction:
+            print(_prediction)
+            prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
+            print(_prediction_index, prediction_tile)
+            if expected_tile == prediction_tile:
                 total_correct += 1
+            else:
+                n_empty_tiles_with_fails[count_n_of_non_placed_tiles(state_to_tiles_dims(example[0], dg)) // 2] += 1
             total_count += 1
         else:
             _prediction = np.reshape(prediction, (width, height))
@@ -333,6 +345,9 @@ def main(options):
 
     if predict_move_index:
         print(f'In total guessed: {total_correct}/{total_count} = {100*(total_correct/ total_count)}%')
+        print(n_empty_tiles_with_fails)
+
+        print('-' * 100)
 
     tiles_left = []
     for i in range(20):

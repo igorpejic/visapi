@@ -57,7 +57,7 @@ class KerasBinpackNNet():
         # self.model.compile(loss=['categorical_crossentropy','mean_squared_error'], optimizer=Adam(args.lr))
         self.model = Model(inputs=self.input_boards, outputs=[self.pi])
         if predict_move_index:
-            self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['accuracy'])
+            self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
             # self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['accuracy'])
         else:
             self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
