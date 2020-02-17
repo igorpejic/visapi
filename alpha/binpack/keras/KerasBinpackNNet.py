@@ -36,7 +36,13 @@ class KerasBinpackNNet():
         h_conv6 = self.residual_block(h_conv5, self.channels)
         h_conv7 = self.residual_block(h_conv6, self.channels)
         h_conv8 = self.residual_block(h_conv7, self.channels)
-        h_conv2 = self.residual_block(h_conv8, self.channels)
+        h_conv9 = self.residual_block(h_conv8, self.channels)
+        h_conv10 = self.residual_block(h_conv9, self.channels)
+        h_conv11 = self.residual_block(h_conv10, self.channels)
+        h_conv12 = self.residual_block(h_conv11, self.channels)
+        h_conv13 = self.residual_block(h_conv12, self.channels)
+        h_conv14 = self.residual_block(h_conv13, self.channels)
+        h_conv2 = self.residual_block(h_conv14, self.channels)
 
         h_conv3 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='valid', use_bias=False)(h_conv2)))        # batch_size  x (board_x-2) x (board_y-2) x num_channels
         h_conv4 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='valid', use_bias=False)(h_conv3)))        # batch_size  x (board_x-4) x (board_y-4) x num_channels
@@ -46,8 +52,8 @@ class KerasBinpackNNet():
 
         if predict_move_index:
             # channels - 1 for state
-            self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(s_fc2)
-            # self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(s_fc2)
+            # self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(s_fc2)
+            self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(s_fc2)
         else:
             self.pi = Dense(self.action_size, activation='softmax', name='pi')(s_fc2)   # batch_size x self.action_size
         self.v = Dense(1, activation='tanh', name='v')(s_fc2)                    # batch_size x 1
@@ -62,7 +68,7 @@ class KerasBinpackNNet():
         else:
             self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
 
-    def residual_block(self, y, nb_channels, _strides=(1, 1), _project_shortcut=True):
+    def residual_block(self, y, nb_channels, _strides=(1, 1), _project_shortcut=False):
         shortcut = y
 
         # down-sampling is performed with a stride of 2

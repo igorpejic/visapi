@@ -86,12 +86,12 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
         grid = np.zeros([height, width])
         for solution_index, solution_tile in enumerate(solution):
             solution_copy = np.copy(solution)
-            randomized_solution_order = np.array(solution_copy[solution_index:])
-            np.random.shuffle(randomized_solution_order)
+            solution_order = np.array(solution_copy[solution_index:])
             solution_tile_dims = solution_tile[:2]
 
-            _tiles_ints = [x[:ORIENTATIONS] for x in randomized_solution_order]
+            _tiles_ints = [x[:ORIENTATIONS] for x in solution_order]
             _tiles_ints = get_tiles_with_orientation(_tiles_ints)
+            _tiles_ints = get_possible_tile_actions_given_grid(grid, _tiles_ints)
             np.random.shuffle(_tiles_ints)
             tiles = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
             tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
@@ -104,14 +104,14 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
 
             if predict_move_index:
                 _tiles_ints = [list(x) for x in _tiles_ints]
-                if _tiles_ints.count(solution_tile_dims) == 1 or True:
+                possible_tiles = len([x for x in _tiles_ints if x != [0,0]])
+                if possible_tiles == 1: # if only one action-tile placement is possible
+                    pass
+                else:
                     solution_index = _tiles_ints.index(solution_tile_dims)
                     example = [state, one_hot_encode(_tiles_ints, solution_tile_dims, state)]
                     examples.append(example)
                     # print(_tiles_ints, solution_tile_dims, one_hot_encode(_tiles_ints, solution_tile_dims, state))
-                else:
-                    # skip squares and duplicates during training
-                    pass
             else:
                 example = [state, pi]
                 if predict_v:
@@ -125,6 +125,25 @@ def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return
 
     return examples
 
+def get_possible_tile_actions_given_grid(grid, tiles):
+    '''
+    given a grid and tiles return the tiles which can be placed in lfb
+    '''
+    next_lfb = SolutionChecker.get_next_lfb_on_grid(grid)
+
+    new_tiles = []
+    rows, cols = grid.shape
+    for i, tile in enumerate(tiles):
+        success, _ = SolutionChecker.place_element_on_grid_given_grid(
+            tile, next_lfb,
+            val=1, grid=grid, cols=cols, rows=rows, get_only_success=True
+        )
+        if not success:
+            continue
+        new_tiles.append(tile)
+    return new_tiles
+
+
 def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=True):
     '''
     1. mask invalid moves
@@ -134,11 +153,11 @@ def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=
 
     Returns the tile which is the best in format [(rows, cols), position_to_place]
     '''
-    rows, cols = grid.shape
     next_lfb = SolutionChecker.get_next_lfb_on_grid(grid)
     max_probability = -math.inf
     max_index = 0
     best_tile = None
+    rows, cols = grid.shape
 
     tile_probabilities = defaultdict(int)
     tile_counts = defaultdict(int)
@@ -274,7 +293,7 @@ def main(options):
     #HEIGHT = 8
     #WIDTH = 8
     predict_move_index = True
-    N_TILES = 15 
+    N_TILES = 10 
     HEIGHT = 12
     WIDTH = 12
     g = Game(HEIGHT, WIDTH, N_TILES)
@@ -314,18 +333,18 @@ def main(options):
             _prediction_index = max_index
             expected = np.argmax(example[1])
 
-            print('-' * 50)
-            print('grid state')
-            print(example[0][:, :, 0])
-            print(state_to_tiles_dims(example[0], dg))
-            print('expected')
-            print(example[1])
+            # print('-' * 50)
+            # print('grid state')
+            # print(example[0][:, :, 0])
+            # print(state_to_tiles_dims(example[0], dg))
+            # print('expected')
+            # print(example[1])
             expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
-            print(expected, expected_tile)
-            print('prediction')
-            print(_prediction)
+            # print(expected, expected_tile)
+            # print('prediction')
+            # print(_prediction)
             prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
-            print(_prediction_index, prediction_tile)
+            # print(_prediction_index, prediction_tile)
             if expected_tile == prediction_tile:
                 total_correct += 1
             else:
