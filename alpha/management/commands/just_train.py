@@ -78,11 +78,11 @@ def get_tiles_with_orientation(tiles):
         tiles_with_orientations.append((tile[1], tile[0]))
     return tiles_with_orientations
 
-def get_examples(N_EXAMPLES, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False, predict_move_index=True):
+def get_examples(given_examples, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False, predict_move_index=True):
     examples = []
-    while len(examples) < N_EXAMPLES:
-        print(f'{len(examples)}/{N_EXAMPLES}')
-        state, solution = gen_state(width, height, n_tiles, dg)
+    for i, _example in enumerate(given_examples):
+        print(f'{i}/{len(given_examples)}')
+        state, solution = _example
         grid = np.zeros([height, width])
         for solution_index, solution_tile in enumerate(solution):
             solution_copy = np.copy(solution)
@@ -229,16 +229,22 @@ def state_to_tiles_dims(state, dg):
     return tiles
 
 
-def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict_move_index=False):
+def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict_move_index=False, verbose=False):
+    tiles = state_to_tiles_dims(tiles, dg)
     while True:
         tiles_left = len(tiles)
         if tiles_left == 0:
             print(f"Success: game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
             return 0
 
-        tiles_in_matrix_shape = dg._transform_instance_to_matrix(tiles, only_one_orientation=True)
+        _tiles_ints = get_possible_tile_actions_given_grid(grid, tiles)
+        if len(_tiles_ints) == 0 and tiles_left:
+            print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
+            return tiles_left / ORIENTATIONS
+        np.random.shuffle(_tiles_ints)
+        tiles_in_matrix_shape = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
         tiles_in_matrix_shape = pad_tiles_with_zero_matrices(
-            tiles_in_matrix_shape, n_tiles * ORIENTATIONS - tiles_left, width, height)
+            tiles_in_matrix_shape, n_tiles * ORIENTATIONS - tiles_in_matrix_shape.shape[2], width, height)
 
         state = np.dstack((np.expand_dims(grid, axis=2), tiles_in_matrix_shape))
         prediction = nnet.predict(state)
@@ -252,12 +258,14 @@ def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict
             # get the  probability matrix
             prediction = get_prediction_masked(prediction, state[:, :, 0])
 
-        # print('-' * 50)
-        # print(grid, prediction)
-        # print(tiles)
+        if verbose:
+            print('-' * 50)
+            print(grid, prediction)
+            print(tiles)
         solution_tile = get_best_tile_by_prediction(
             grid, state_to_tiles_dims(state, dg), prediction, dg, predict_move_index=predict_move_index)
-        # print(solution_tile)
+        if verbose:
+            print(solution_tile)
         if solution_tile is None:
             print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
             return tiles_left / ORIENTATIONS
@@ -288,14 +296,22 @@ class Command(BaseCommand):
 def count_n_of_non_placed_tiles(tiles):
     return len([tile for tile in tiles if tile != (0, 0)])
 
+def get_n_examples(N_EXAMPLES, width, height, n_tiles, dg):
+    examples = []
+    for i in range(N_EXAMPLES):
+        print(f'{i}/{N_EXAMPLES}')
+        state, solution = gen_state(width, height, n_tiles, dg)
+        examples.append([state, solution])
+    return examples
+
 def main(options):
     #N_TILES = 8 
     #HEIGHT = 8
     #WIDTH = 8
     predict_move_index = True
-    N_TILES = 10 
-    HEIGHT = 12
-    WIDTH = 12
+    N_TILES = 15 
+    HEIGHT = 10
+    WIDTH = 10
     g = Game(HEIGHT, WIDTH, N_TILES)
 
     dg = DataGenerator(WIDTH, HEIGHT)
@@ -311,16 +327,18 @@ def main(options):
         # place tiles one by one
         # generate pair x and y where x is stack of state + tiles
         print('Preparing examples')
-        N_EXAMPLES = 12000
+        N_EXAMPLES = 1200
 
-        train_examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, return_binary_mask=True, predict_move_index=True)
+        examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg)
+        train_examples = get_examples(examples, N_TILES, height, width, dg, return_binary_mask=True, predict_move_index=True)
         nnet.train(train_examples)
         nnet.save_checkpoint()
 
-    np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})
+    np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)}, linewidth=115)
 
-    N_EXAMPLES = 200
-    _examples = get_examples(N_EXAMPLES, N_TILES, height, width, dg, from_file=True, return_binary_mask=True, predict_move_index=True)
+    N_EXAMPLES = 20
+    examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg)
+    _examples = get_examples(examples, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True)[:N_EXAMPLES]
     total_correct = 0
     total_count = 0
     
@@ -341,8 +359,8 @@ def main(options):
             # print(example[1])
             expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
             # print(expected, expected_tile)
-            # print('prediction')
-            # print(_prediction)
+            #print('prediction')
+            #print(_prediction)
             prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
             # print(_prediction_index, prediction_tile)
             if expected_tile == prediction_tile:
@@ -369,8 +387,9 @@ def main(options):
         print('-' * 100)
 
     tiles_left = []
-    for i in range(20):
-        tiles, grid = dg.gen_tiles_and_board(n_tiles, width, height, from_file=False)
+    for example in examples:
+        tiles, _ = example
+        # tiles = dg.get_matrix_tile_dims(tiles)
         grid = np.zeros((width, height))
         tiles_left.append(play_using_prediction(nnet, width, height, tiles, grid, N_TILES, dg, predict_move_index))
         # [0, 6, 4, 2, 2, 2, 0, 4, 4, 8, 6, 2, 2, 6, 6, 8, 6, 4, 4, 4]
