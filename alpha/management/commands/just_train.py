@@ -309,7 +309,7 @@ def main(options):
     #HEIGHT = 8
     #WIDTH = 8
     predict_move_index = True
-    N_TILES = 15 
+    N_TILES = 10 
     HEIGHT = 10
     WIDTH = 10
     g = Game(HEIGHT, WIDTH, N_TILES)

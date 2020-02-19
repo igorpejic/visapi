@@ -7,6 +7,7 @@ from keras.models import *
 from keras.layers import *
 from keras import layers
 from keras.optimizers import *
+from keras.regularizers import l2
 
 class KerasBinpackNNet():
     def __init__(self, game, args, predict_move_index=True):
@@ -21,42 +22,49 @@ class KerasBinpackNNet():
 
         # batch_size  x board_x x board_y x 1
         # x_image = Reshape((self.channels, self.board_x, self.board_y, 1))(self.input_boards)
-        x_image = Reshape((self.board_x, self.board_y, -1))(self.input_boards)
+        x = Reshape((self.board_x, self.board_y, -1))(self.input_boards)
 
-        # batch_size  x board_x x board_y x num_channels
-        # h_conv1 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='same', use_bias=False)(x_image))) 
-        h_conv1 = self.residual_block(x_image, self.channels)
+        # https://keras.io/examples/cifar10_resnet/
+        depth = 26
+        num_res_blocks = int((depth - 2) / 6)
+        num_filters = self.channels + 26
+        # Instantiate the stack of residual units
+        for stack in range(3):
+            for res_block in range(num_res_blocks):
+                strides = 1
+                if stack > 0 and res_block == 0:  # first layer but not first stack
+                    strides = 2  # downsample
+                y = self.resnet_layer(inputs=x,
+                                 num_filters=num_filters,
+                                 strides=strides)
+                y = self.resnet_layer(inputs=y,
+                                 num_filters=num_filters,
+                                 activation=None)
+                if stack > 0 and res_block == 0:  # first layer but not first stack
+                    # linear projection residual shortcut connection to match
+                    # changed dims
+                    x = self.resnet_layer(inputs=x,
+                                     num_filters=num_filters,
+                                     kernel_size=1,
+                                     strides=strides,
+                                     activation=None,
+                                     batch_normalization=False)
+                x = layers.add([x, y])
+                x = Activation('relu')(x)
+            num_filters *= 2
 
-        # batch_size  x board_x x board_y x num_channels
-        # h_conv2 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='same', use_bias=False)(h_conv1))) 
-        h_conv2 = self.residual_block(h_conv1, self.channels)
-        # h_conv3 = self.residual_block(h_conv2, self.channels)
-        # h_conv4 = self.residual_block(h_conv3, self.channels)
-        # h_conv5 = self.residual_block(h_conv4, self.channels)
-        # h_conv6 = self.residual_block(h_conv5, self.channels)
-        # h_conv7 = self.residual_block(h_conv6, self.channels)
-        # h_conv8 = self.residual_block(h_conv7, self.channels)
-        # h_conv9 = self.residual_block(h_conv8, self.channels)
-        # h_conv10 = self.residual_block(h_conv9, self.channels)
-        # h_conv11 = self.residual_block(h_conv10, self.channels)
-        # h_conv12 = self.residual_block(h_conv11, self.channels)
-        # h_conv13 = self.residual_block(h_conv12, self.channels)
-        # h_conv14 = self.residual_block(h_conv13, self.channels)
-        # h_conv2 = self.residual_block(h_conv14, self.channels)
-
-        h_conv3 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='valid', use_bias=False)(h_conv2)))        # batch_size  x (board_x-2) x (board_y-2) x num_channels
-        h_conv4 = Activation('relu')(BatchNormalization(axis=3)(Conv2D(self.channels, 3, padding='valid', use_bias=False)(h_conv3)))        # batch_size  x (board_x-4) x (board_y-4) x num_channels
-        h_conv4_flat = Flatten()(h_conv4)       
-        s_fc1 = Dropout(args.dropout)(Activation('relu')(BatchNormalization(axis=1)(Dense(1024, use_bias=False)(h_conv4_flat))))  # batch_size x 1024
-        s_fc2 = Dropout(args.dropout)(Activation('relu')(BatchNormalization(axis=1)(Dense(512, use_bias=False)(s_fc1))))          # batch_size x 1024
+        # Add classifier on top.
+        # v1 does not use BN after last shortcut connection-ReLU
+        x = AveragePooling2D(pool_size=3)(x)
+        y = Flatten()(x)
 
         if predict_move_index:
             # channels - 1 for state
-            self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(s_fc2)
-            # self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(s_fc2)
+            # self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(y)
+            self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(y)
         else:
-            self.pi = Dense(self.action_size, activation='softmax', name='pi')(s_fc2)   # batch_size x self.action_size
-        self.v = Dense(1, activation='tanh', name='v')(s_fc2)                    # batch_size x 1
+            self.pi = Dense(self.action_size, activation='softmax', name='pi')(y)   # batch_size x self.action_size
+        self.v = Dense(1, activation='tanh', name='v')(y)                    # batch_size x 1
 
         # 2 losses
         # self.model = Model(inputs=self.input_boards, outputs=[self.pi, self.v])
@@ -90,3 +98,48 @@ class KerasBinpackNNet():
         y = layers.LeakyReLU()(y)
 
         return y
+
+    def resnet_layer(self,
+                     inputs,
+                     num_filters=16,
+                     kernel_size=3,
+                     strides=1,
+                     activation='relu',
+                     batch_normalization=True,
+                     conv_first=True):
+        """2D Convolution-Batch Normalization-Activation stack builder
+
+        # Arguments
+            inputs (tensor): input tensor from input image or previous layer
+            num_filters (int): Conv2D number of filters
+            kernel_size (int): Conv2D square kernel dimensions
+            strides (int): Conv2D square stride dimensions
+            activation (string): activation name
+            batch_normalization (bool): whether to include batch normalization
+            conv_first (bool): conv-bn-activation (True) or
+                bn-activation-conv (False)
+
+        # Returns
+            x (tensor): tensor as input to the next layer
+        """
+        conv = Conv2D(num_filters,
+                      kernel_size=kernel_size,
+                      strides=strides,
+                      padding='same',
+                      kernel_initializer='he_normal',
+                      kernel_regularizer=l2(1e-4))
+
+        x = inputs
+        if conv_first:
+            x = conv(x)
+            if batch_normalization:
+                x = layers.BatchNormalization()(x)
+            if activation is not None:
+                x = layers.Activation(activation)(x)
+        else:
+            if batch_normalization:
+                x = layers.BatchNormalization()(x)
+            if activation is not None:
+                x = layers.Activation(activation)(x)
+            x = conv(x)
+        return x

@@ -17,8 +17,8 @@ from keras.models import load_model
 
 args = dotdict({
     'lr': 0.001,
-    'dropout': 0.3,
-    'epochs': 30,
+    'dropout': 0.5,
+    'epochs': 60,
     'batch_size': 64,
     'cuda': False,
     'num_channels': 512,
