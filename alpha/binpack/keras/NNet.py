@@ -85,14 +85,21 @@ class NNetWrapper(NeuralNet):
         start = time.time()
 
         # preparing input
-        board = board[np.newaxis, :, :]
-
+        if self.scalar_tiles:
+            board, tiles = board
+            board = board[np.newaxis, :, :]
+            tiles = tiles[np.newaxis, :, :]
+        else:
+            board = board[np.newaxis, :, :]
         # run
         if self.predict_v:
             pi, v = self.nnet.model.predict(board)
             return pi[0], v[0]
         else:
-            pi = self.nnet.model.predict(board)
+            if self.scalar_tiles:
+                pi = self.nnet.model.predict([board, tiles])
+            else:
+                pi = self.nnet.model.predict(board)
             return pi[0]
 
         #print('PREDICTION TIME TAKEN : {0:03f}'.format(time.time()-start))

@@ -369,19 +369,22 @@ def main(options):
     np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)}, linewidth=115)
 
     N_EXAMPLES = 20
-    examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg)
+    examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
     _examples = get_examples(examples, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES)[:N_EXAMPLES]
     total_correct = 0
     total_count = 0
     
     n_empty_tiles_with_fails = [0] * (N_TILES + 1)
     for example in _examples:
-        prediction = nnet.predict(example[0])
+        prediction = nnet.predict([example[0], example[1]])
         if predict_move_index:
             _prediction = prediction
             max_index = np.argmax(prediction)
             _prediction_index = max_index
-            expected = np.argmax(example[1])
+            if SCALAR_TILES:
+                expected = np.argmax(example[2])
+            else:
+                expected = np.argmax(example[1])
 
             # print('-' * 50)
             # print('grid state')
@@ -389,16 +392,26 @@ def main(options):
             # print(state_to_tiles_dims(example[0], dg))
             # print('expected')
             # print(example[1])
-            expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
-            # print(expected, expected_tile)
-            #print('prediction')
-            #print(_prediction)
-            prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
-            # print(_prediction_index, prediction_tile)
-            if expected_tile == prediction_tile:
-                total_correct += 1
+            if SCALAR_TILES:
+                expected_tile = example[1][expected]
+                prediction_tile = example[1][_prediction_index]
             else:
-                n_empty_tiles_with_fails[count_n_of_non_placed_tiles(state_to_tiles_dims(example[0], dg)) // 2] += 1
+                expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
+                prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
+            print(expected, expected_tile)
+            print('prediction')
+            print(_prediction)
+            print(_prediction_index, prediction_tile)
+            if SCALAR_TILES:
+                if np.array_equal(expected_tile, prediction_tile):
+                    total_correct += 1
+                else:
+                    n_empty_tiles_with_fails[count_n_of_non_placed_tiles(example[1]) // 2] += 1
+            else:
+                if expected_tile == prediction_tile:
+                    total_correct += 1
+                else:
+                    n_empty_tiles_with_fails[count_n_of_non_placed_tiles(state_to_tiles_dims(example[0], dg)) // 2] += 1
             total_count += 1
         else:
             _prediction = np.reshape(prediction, (width, height))
