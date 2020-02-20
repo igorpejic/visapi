@@ -30,15 +30,19 @@ args = dotdict({
 
 })
 
-def gen_state(width, height, n_tiles, dg):
+def gen_state(width, height, n_tiles, dg, scalar_tiles=False):
     '''
     get tiles and solution
     '''
 
-    tiles, solution = dg.gen_matrix_instance(n_tiles, width, height, with_solution=True)
     board = np.zeros([height, width, 1])
-    state = np.dstack((board, tiles))
-    return state, solution
+    if scalar_tiles:
+        tiles, solution = dg.gen_instance(n_tiles, width, height)
+        return board, tiles, solution
+    else:
+        tiles, solution = dg.gen_matrix_instance(n_tiles, width, height, with_solution=True)
+        state = np.dstack((board, tiles))
+        return state, solution
 
 def solution_to_solution_matrix(solution, rows, cols, return_binary_mask=False):
     '''
@@ -64,9 +68,17 @@ def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
     zero_matrices = np.zeros([rows, cols, n_zero_matrices_to_add])
     return np.dstack((tiles, zero_matrices))
 
-def one_hot_encode(tiles_ints, solution_tile, state):
-    _n_actions = state.shape[2] - 1
-    b = np.zeros((_n_actions))
+def pad_tiles_with_zero_scalars(tiles, n_zero_tiles_to_add, rows, cols):
+    '''
+    add tiles with zero matrices to compensate for tiles which were already placed
+    '''
+    new_tiles = tiles[:]
+    for i in range(n_zero_tiles_to_add):
+        new_tiles.append([0, 0])
+    return new_tiles
+
+def one_hot_encode(tiles_ints, solution_tile, n_actions):
+    b = np.zeros((n_actions))
     for i, tile in enumerate(tiles_ints):
         if tile == solution_tile:
             b[i] = 1
@@ -78,11 +90,20 @@ def get_tiles_with_orientation(tiles):
         tiles_with_orientations.append((tile[1], tile[0]))
     return tiles_with_orientations
 
-def get_examples(given_examples, n_tiles, height, width, dg, from_file=False, return_binary_mask=False, predict_v=False, predict_move_index=True):
+def tiles_to_np_array(tiles):
+    return np.array([np.array(x) for x in tiles])
+
+def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
+                 return_binary_mask=False, predict_v=False, predict_move_index=True,
+                 scalar_tiles=False
+                 ):
     examples = []
     for i, _example in enumerate(given_examples):
         print(f'{i}/{len(given_examples)}')
-        state, solution = _example
+        if scalar_tiles:
+            state, tiles, solution = _example
+        else:
+            state, solution = _example
         grid = np.zeros([height, width])
         for solution_index, solution_tile in enumerate(solution):
             solution_copy = np.copy(solution)
@@ -93,10 +114,16 @@ def get_examples(given_examples, n_tiles, height, width, dg, from_file=False, re
             _tiles_ints = get_tiles_with_orientation(_tiles_ints)
             _tiles_ints = get_possible_tile_actions_given_grid(grid, _tiles_ints)
             np.random.shuffle(_tiles_ints)
-            tiles = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
-            tiles = pad_tiles_with_zero_matrices(tiles,  ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
+            if scalar_tiles:
+                tiles = tiles_to_np_array(pad_tiles_with_zero_scalars(
+                    _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints), width, height))
+                state = state.squeeze()
+            else:
+                tiles = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
+                tiles = pad_tiles_with_zero_matrices(tiles, ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
+                state = np.dstack((np.expand_dims(grid, axis=2), tiles))
             pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height, return_binary_mask=False).flatten()
-            state = np.dstack((np.expand_dims(grid, axis=2), tiles))
+
             # v = N_TILES - solution_index
             v = 1
             if solution_index == len(solution) - 1 :
@@ -109,7 +136,10 @@ def get_examples(given_examples, n_tiles, height, width, dg, from_file=False, re
                     pass
                 else:
                     solution_index = _tiles_ints.index(solution_tile_dims)
-                    example = [state, one_hot_encode(_tiles_ints, solution_tile_dims, state)]
+                    if scalar_tiles:
+                        example = [state, tiles, one_hot_encode(_tiles_ints, solution_tile_dims, len(tiles) )]
+                    else:
+                        example = [state, one_hot_encode(_tiles_ints, solution_tile_dims, state.shape[2] - 1)]
                     examples.append(example)
                     # print(_tiles_ints, solution_tile_dims, one_hot_encode(_tiles_ints, solution_tile_dims, state))
             else:
@@ -296,18 +326,19 @@ class Command(BaseCommand):
 def count_n_of_non_placed_tiles(tiles):
     return len([tile for tile in tiles if tile != (0, 0)])
 
-def get_n_examples(N_EXAMPLES, width, height, n_tiles, dg):
+def get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=True):
     examples = []
     for i in range(N_EXAMPLES):
         print(f'{i}/{N_EXAMPLES}')
-        state, solution = gen_state(width, height, n_tiles, dg)
-        examples.append([state, solution])
+        example = gen_state(width, height, n_tiles, dg, scalar_tiles=scalar_tiles)
+        examples.append([*example])
     return examples
 
 def main(options):
     #N_TILES = 8 
     #HEIGHT = 8
     #WIDTH = 8
+    SCALAR_TILES = True
     predict_move_index = True
     N_TILES = 10 
     HEIGHT = 10
@@ -318,7 +349,7 @@ def main(options):
 
     # from alpha.binpack.tensorflow.NNet import NNetWrapper as nn
     from alpha.binpack.keras.NNet import NNetWrapper as nn
-    nnet = nn(g)
+    nnet = nn(g, scalar_tiles=SCALAR_TILES)
 
     n_tiles, height, width = N_TILES, HEIGHT, WIDTH
     if options['load_model']:
@@ -329,8 +360,9 @@ def main(options):
         print('Preparing examples')
         N_EXAMPLES = 1200
 
-        examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg)
-        train_examples = get_examples(examples, N_TILES, height, width, dg, return_binary_mask=True, predict_move_index=True)
+        examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
+        print(examples)
+        train_examples = get_examples(examples, N_TILES, height, width, dg, return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES)
         nnet.train(train_examples)
         nnet.save_checkpoint()
 
@@ -338,7 +370,7 @@ def main(options):
 
     N_EXAMPLES = 20
     examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg)
-    _examples = get_examples(examples, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True)[:N_EXAMPLES]
+    _examples = get_examples(examples, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES)[:N_EXAMPLES]
     total_correct = 0
     total_count = 0
     

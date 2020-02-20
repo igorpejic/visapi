@@ -10,7 +10,8 @@ from keras.optimizers import *
 from keras.regularizers import l2
 from alpha.binpack.keras.utils import residual_block, resnet_layer
 
-class KerasBinpackNNet():
+ORIENTATIONS = 2
+class ScalarKerasBinpackNNet():
     def __init__(self, game, args, predict_move_index=True, scalar_tiles=False):
         # game params
         self.board_x, self.board_y, self.channels = game.getBoardSize()
@@ -18,14 +19,15 @@ class KerasBinpackNNet():
         self.args = args
 
         # s: batch_size x board_x x board_y
-        self.input_boards = Input(shape=(self.board_x, self.board_y, self.channels))
+        self.input_board = Input(shape=(self.board_x, self.board_y))
+        self.input_tiles = Input(shape=(self.channels - 1, ORIENTATIONS))
 
-        x = Reshape((self.board_x, self.board_y, -1))(self.input_boards)
+        x = Reshape((self.board_x, self.board_y, 1))(self.input_board)
 
         # https://keras.io/examples/cifar10_resnet/
-        depth = 38
+        depth = 26
         num_res_blocks = int((depth - 2) / 6)
-        num_filters = self.channels 
+        num_filters = 5
         # Instantiate the stack of residual units
         for stack in range(3):
             for res_block in range(num_res_blocks):
@@ -54,7 +56,12 @@ class KerasBinpackNNet():
         # Add classifier on top.
         # v1 does not use BN after last shortcut connection-ReLU
         x = AveragePooling2D(pool_size=3)(x)
-        y = Flatten()(x)
+        y_state = Flatten()(x)
+
+        y_tiles = Flatten()(self.input_tiles)
+        y_tiles = Dense(self.action_size)(y_tiles)
+
+        y = Concatenate(name='concatenation')([y_state, y_tiles])
 
         if predict_move_index:
             # channels - 1 for state
@@ -67,9 +74,10 @@ class KerasBinpackNNet():
         # 2 losses
         # self.model = Model(inputs=self.input_boards, outputs=[self.pi, self.v])
         # self.model.compile(loss=['categorical_crossentropy','mean_squared_error'], optimizer=Adam(args.lr))
-        self.model = Model(inputs=self.input_boards, outputs=[self.pi])
+        self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi])
         if predict_move_index:
             self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
             # self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['accuracy'])
         else:
             self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
+
