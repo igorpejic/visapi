@@ -194,6 +194,7 @@ def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=
     tiles_to_iterate_on = tiles
 
     for i, tile in enumerate(tiles_to_iterate_on):
+        tile = tuple(tile)
         success, _ = SolutionChecker.place_element_on_grid_given_grid(
             tile, next_lfb,
             val=1, grid=grid, cols=cols, rows=rows, get_only_success=True
@@ -206,7 +207,7 @@ def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=
             The best tile is predicted by taking the sum of the tiles
             with the same (width, height)
             '''
-            if tile == (0, 0):
+            if tuple(tile) == (0, 0):
                 continue
             tile_probabilities[tile] += prediction[i]
             tile_counts[tile] += 1
@@ -259,8 +260,12 @@ def state_to_tiles_dims(state, dg):
     return tiles
 
 
-def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict_move_index=False, verbose=False):
-    tiles = state_to_tiles_dims(tiles, dg)
+def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg,
+                          predict_move_index=False, verbose=False, scalar_tiles=False):
+    if scalar_tiles:
+        tiles = tiles
+    else:
+        tiles = state_to_tiles_dims(tiles, dg)
     while True:
         tiles_left = len(tiles)
         if tiles_left == 0:
@@ -272,12 +277,19 @@ def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict
             print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
             return tiles_left / ORIENTATIONS
         np.random.shuffle(_tiles_ints)
-        tiles_in_matrix_shape = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
-        tiles_in_matrix_shape = pad_tiles_with_zero_matrices(
-            tiles_in_matrix_shape, n_tiles * ORIENTATIONS - tiles_in_matrix_shape.shape[2], width, height)
+        if scalar_tiles:
+            _tiles = tiles_to_np_array(pad_tiles_with_zero_scalars(
+                _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints), width, height))
+            # state = state.squeeze()
 
-        state = np.dstack((np.expand_dims(grid, axis=2), tiles_in_matrix_shape))
-        prediction = nnet.predict(state)
+            prediction = nnet.predict([grid, tiles_to_np_array(_tiles)])
+        else:
+            tiles_in_matrix_shape = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
+            tiles_in_matrix_shape = pad_tiles_with_zero_matrices(
+                tiles_in_matrix_shape, n_tiles * ORIENTATIONS - tiles_in_matrix_shape.shape[2], width, height)
+
+            state = np.dstack((np.expand_dims(grid, axis=2), tiles_in_matrix_shape))
+            prediction = nnet.predict(state)
 
         if not predict_move_index:
             if len(prediction) == 2: # if we are also predicting v
@@ -292,8 +304,12 @@ def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict
             print('-' * 50)
             print(grid, prediction)
             print(tiles)
+        if scalar_tiles:
+            _ttiles = tiles
+        else:
+            _ttiles = state_to_tiles_dims(state, dg)
         solution_tile = get_best_tile_by_prediction(
-            grid, state_to_tiles_dims(state, dg), prediction, dg, predict_move_index=predict_move_index)
+            grid, _ttiles, prediction, dg, predict_move_index=predict_move_index)
         if verbose:
             print(solution_tile)
         if solution_tile is None:
@@ -309,6 +325,8 @@ def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg, predict
             print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
             return tiles_left / ORIENTATIONS
 
+        if scalar_tiles:
+            tiles = [tuple(x) for x in tiles]
         tiles = SolutionChecker.eliminate_pair_tiles(tiles, solution_tile[0])
     return 0
 
@@ -324,7 +342,7 @@ class Command(BaseCommand):
         main(options)
 
 def count_n_of_non_placed_tiles(tiles):
-    return len([tile for tile in tiles if tile != (0, 0)])
+    return len([tile for tile in tiles if tuple(tile) != (0, 0)])
 
 def get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=True):
     examples = []
@@ -386,15 +404,16 @@ def main(options):
             else:
                 expected = np.argmax(example[1])
 
-            # print('-' * 50)
+            print('-' * 50)
             # print('grid state')
             # print(example[0][:, :, 0])
             # print(state_to_tiles_dims(example[0], dg))
-            # print('expected')
-            # print(example[1])
+            print('expected')
+            print(example[2])
             if SCALAR_TILES:
                 expected_tile = example[1][expected]
                 prediction_tile = example[1][_prediction_index]
+                print(example[1].tolist())
             else:
                 expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
                 prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
@@ -433,10 +452,15 @@ def main(options):
 
     tiles_left = []
     for example in examples:
-        tiles, _ = example
+        if SCALAR_TILES:
+            state, tiles, _ = example
+            tiles = get_tiles_with_orientation(tiles.tolist())
+        else:
+            tiles, _ = example
         # tiles = dg.get_matrix_tile_dims(tiles)
         grid = np.zeros((width, height))
-        tiles_left.append(play_using_prediction(nnet, width, height, tiles, grid, N_TILES, dg, predict_move_index))
+        tiles_left.append(play_using_prediction(
+            nnet, width, height, tiles, grid, N_TILES, dg, predict_move_index, scalar_tiles=SCALAR_TILES))
         # [0, 6, 4, 2, 2, 2, 0, 4, 4, 8, 6, 2, 2, 6, 6, 8, 6, 4, 4, 4]
     print(tiles_left)
 
