@@ -1,3 +1,4 @@
+import pickle
 from django.core.management.base import BaseCommand
 from alpha.Coach import Coach
 import math
@@ -29,6 +30,8 @@ args = dotdict({
     'numItersForTrainExamplesHistory': 40,
 
 })
+
+tiles_to_np_array = SolutionChecker.tiles_to_np_array
 
 def gen_state(width, height, n_tiles, dg, scalar_tiles=False):
     '''
@@ -68,14 +71,6 @@ def pad_tiles_with_zero_matrices(tiles, n_zero_matrices_to_add, rows, cols):
     zero_matrices = np.zeros([rows, cols, n_zero_matrices_to_add])
     return np.dstack((tiles, zero_matrices))
 
-def pad_tiles_with_zero_scalars(tiles, n_zero_tiles_to_add, rows, cols):
-    '''
-    add tiles with zero matrices to compensate for tiles which were already placed
-    '''
-    new_tiles = tiles[:]
-    for i in range(n_zero_tiles_to_add):
-        new_tiles.append([0, 0])
-    return new_tiles
 
 def one_hot_encode(tiles_ints, solution_tile, n_actions):
     b = np.zeros((n_actions))
@@ -84,14 +79,8 @@ def one_hot_encode(tiles_ints, solution_tile, n_actions):
             b[i] = 1
     return b
 
-def get_tiles_with_orientation(tiles):
-    tiles_with_orientations = tiles[:]
-    for tile in tiles:
-        tiles_with_orientations.append((tile[1], tile[0]))
-    return tiles_with_orientations
+get_tiles_with_orientation = SolutionChecker.get_tiles_with_orientation
 
-def tiles_to_np_array(tiles):
-    return np.array([np.array(x) for x in tiles])
 
 def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
                  return_binary_mask=False, predict_v=False, predict_move_index=True,
@@ -112,11 +101,11 @@ def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
 
             _tiles_ints = [x[:ORIENTATIONS] for x in solution_order]
             _tiles_ints = get_tiles_with_orientation(_tiles_ints)
-            _tiles_ints = get_possible_tile_actions_given_grid(grid, _tiles_ints)
+            _tiles_ints = SolutionChecker.get_possible_tile_actions_given_grid(grid, _tiles_ints)
             np.random.shuffle(_tiles_ints)
             if scalar_tiles:
-                tiles = tiles_to_np_array(pad_tiles_with_zero_scalars(
-                    _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints), width, height))
+                tiles = tiles_to_np_array(SolutionChecker.pad_tiles_with_zero_scalars(
+                    _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints)))
                 state = state.squeeze()
             else:
                 tiles = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
@@ -130,14 +119,13 @@ def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
                 continue
 
             if predict_move_index:
-                _tiles_ints = [list(x) for x in _tiles_ints]
-                possible_tiles = len([x for x in _tiles_ints if x != [0,0]])
-                if possible_tiles == 1: # if only one action-tile placement is possible
+                n_possible_tiles = SolutionChecker.get_n_nonplaced_tiles(_tiles_ints)
+                if n_possible_tiles == 1: # if only one action-tile placement is possible
                     pass
                 else:
                     solution_index = _tiles_ints.index(solution_tile_dims)
                     if scalar_tiles:
-                        example = [state, tiles, one_hot_encode(_tiles_ints, solution_tile_dims, len(tiles) )]
+                        example = [grid.copy(), tiles, one_hot_encode(_tiles_ints, solution_tile_dims, len(tiles) )]
                     else:
                         example = [state, one_hot_encode(_tiles_ints, solution_tile_dims, state.shape[2] - 1)]
                     examples.append(example)
@@ -154,25 +142,6 @@ def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
             )
 
     return examples
-
-def get_possible_tile_actions_given_grid(grid, tiles):
-    '''
-    given a grid and tiles return the tiles which can be placed in lfb
-    '''
-    next_lfb = SolutionChecker.get_next_lfb_on_grid(grid)
-
-    new_tiles = []
-    rows, cols = grid.shape
-    for i, tile in enumerate(tiles):
-        success, _ = SolutionChecker.place_element_on_grid_given_grid(
-            tile, next_lfb,
-            val=1, grid=grid, cols=cols, rows=rows, get_only_success=True
-        )
-        if not success:
-            continue
-        new_tiles.append(tile)
-    return new_tiles
-
 
 def get_best_tile_by_prediction(grid, tiles, prediction, dg, predict_move_index=True):
     '''
@@ -272,13 +241,13 @@ def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg,
             print(f"Success: game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
             return 0
 
-        _tiles_ints = get_possible_tile_actions_given_grid(grid, tiles)
+        _tiles_ints = SolutionChecker.get_possible_tile_actions_given_grid(grid, tiles)
         if len(_tiles_ints) == 0 and tiles_left:
             print(f"game ended with {tiles_left / ORIENTATIONS} tiles left unplaced.")
             return tiles_left / ORIENTATIONS
         np.random.shuffle(_tiles_ints)
         if scalar_tiles:
-            _tiles = tiles_to_np_array(pad_tiles_with_zero_scalars(
+            _tiles = tiles_to_np_array(SolutionChecker.pad_tiles_with_zero_scalars(
                 _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints), width, height))
             # state = state.squeeze()
 
@@ -337,6 +306,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--load_model', action='store_true', help='Load pretrained model')
+        parser.add_argument('--load_examples', action='store_true', help='Load train data which was once generated')
 
     def handle(self, *args, **options):
         main(options)
@@ -376,15 +346,23 @@ def main(options):
         # place tiles one by one
         # generate pair x and y where x is stack of state + tiles
         print('Preparing examples')
-        N_EXAMPLES = 1200
+        N_EXAMPLES = 1700
 
         examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
         print(examples)
-        train_examples = get_examples(examples, N_TILES, height, width, dg, return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES)
+        if options['load_examples']:
+            with open('models/train_examples.pickle', 'rb') as f:
+                train_examples = pickle.load(f)
+        else:
+            train_examples = get_examples(
+                examples, N_TILES, height, width, dg, return_binary_mask=True,
+                predict_move_index=True, scalar_tiles=SCALAR_TILES)
+            with open('models/train_examples.pickle', 'wb') as f:
+                pickle.dump(train_examples, f)
         nnet.train(train_examples)
         nnet.save_checkpoint()
 
-    np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)}, linewidth=115)
+    np.set_printoptions(formatter={'float': lambda x: "{0:0.0f}".format(x)}, linewidth=115)
 
     N_EXAMPLES = 20
     examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
@@ -405,11 +383,11 @@ def main(options):
                 expected = np.argmax(example[1])
 
             print('-' * 50)
-            # print('grid state')
-            # print(example[0][:, :, 0])
-            # print(state_to_tiles_dims(example[0], dg))
-            print('expected')
-            print(example[2])
+            # if not scalar_tiles:
+               # print('grid state')
+               # print(example[0][:, :, 0])
+               # print(state_to_tiles_dims(example[0], dg))
+            # print('expected')
             if SCALAR_TILES:
                 expected_tile = example[1][expected]
                 prediction_tile = example[1][_prediction_index]
@@ -417,10 +395,12 @@ def main(options):
             else:
                 expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
                 prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
-            print(expected, expected_tile)
-            print('prediction')
-            print(_prediction)
-            print(_prediction_index, prediction_tile)
+            print(example[0])
+            # print(expected, expected_tile)
+            #print('prediction')
+            # print(_prediction)
+            #print(_prediction_index, prediction_tile)
+            print(f'expected: {expected_tile}, got: {prediction_tile}')
             if SCALAR_TILES:
                 if np.array_equal(expected_tile, prediction_tile):
                     total_correct += 1

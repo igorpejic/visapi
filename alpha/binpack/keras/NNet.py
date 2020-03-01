@@ -5,7 +5,6 @@ import time
 import random
 import numpy as np
 import math
-from dotdict import *
 import sys
 sys.path.append('../..')
 from utils import *
@@ -16,24 +15,28 @@ from .KerasBinpackNNet import KerasBinpackNNet as onnet
 from .ScalarKerasBinpackNNet import ScalarKerasBinpackNNet
 from keras.models import load_model
 
+class dotdict(dict):
+    def __getattr__(self, name):
+        return self[name]
+
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.5,
-    'epochs': 30,
+    'epochs': 20,
     'batch_size': 64,
     'cuda': False,
     'num_channels': 512,
 })
 
 class NNetWrapper(NeuralNet):
-    def __init__(self, game, predict_move_index=True, scalar_tiles=False):
+    def __init__(self, game, predict_move_index=True, scalar_tiles=True, predict_v=False):
         if scalar_tiles:
-            self.nnet = ScalarKerasBinpackNNet(game, args, predict_move_index=predict_move_index, scalar_tiles=scalar_tiles)
+            self.nnet = ScalarKerasBinpackNNet(game, args, predict_move_index=predict_move_index, scalar_tiles=scalar_tiles, predict_v=predict_v)
         else:
             self.nnet = onnet(game, args, predict_move_index=predict_move_index, scalar_tiles=scalar_tiles)
         self.board_x, self.board_y, self.channels = game.getBoardSize()
         self.action_size = game.getActionSize()
-        self.predict_v = False
+        self.predict_v = predict_v
         self.predict_move_index = predict_move_index
         self.scalar_tiles = scalar_tiles
 
@@ -45,16 +48,17 @@ class NNetWrapper(NeuralNet):
         if self.predict_v:
             if self.scalar_tiles:
                 input_boards, input_tiles, target_pis, target_vs = list(zip(*examples))
+                input_tiles = np.asarray(input_tiles)
             else:
                 input_boards, target_pis, target_vs = list(zip(*examples))
         else:
             if self.scalar_tiles:
                 input_boards, input_tiles, target_pis = list(zip(*examples))
+                input_tiles = np.asarray(input_tiles)
             else:
                 input_boards, target_pis = list(zip(*examples))
 
         input_boards = np.asarray(input_boards)
-        input_tiles = np.asarray(input_tiles)
         target_pis = np.asarray(target_pis)
         y = [target_pis]
         if self.predict_v:
@@ -93,7 +97,10 @@ class NNetWrapper(NeuralNet):
             board = board[np.newaxis, :, :]
         # run
         if self.predict_v:
-            pi, v = self.nnet.model.predict(board)
+            if self.scalar_tiles:
+                pi, v = self.nnet.model.predict([board, tiles])
+            else:
+                pi, v = self.nnet.model.predict(board)
             return pi[0], v[0]
         else:
             if self.scalar_tiles:
