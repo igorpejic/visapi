@@ -26,10 +26,11 @@ class ScalarKerasBinpackNNet():
 
         if predict_move_index:
             # channels - 1 for state
-            self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(y)
-            # self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(y)
+            # self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(y)
+            self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(y)
         else:
             self.pi = Dense(self.action_size, activation='softmax', name='pi')(y)   # batch_size x self.action_size
+
         self.v = Dense(1, activation='tanh', name='v')(y)                    # batch_size x 1
 
         # 2 losses
@@ -40,8 +41,8 @@ class ScalarKerasBinpackNNet():
         else:
             self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi])
             if predict_move_index:
-                self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
-                # self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['accuracy'])
+                # self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
+                self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
             else:
                 self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
 
@@ -76,9 +77,10 @@ class ScalarKerasBinpackNNet():
         #     num_filters *= 2
 
         # x = MaxPooling2D(pool_size=3)(x)
-
-        x = Dense(512)(x)
-        x = Dense(256)(x)
+        x = Dense(512, activation='relu')(x)
+        x = Dropout(0.6)(x)
+        x = Dense(512, activation='relu')(x)
+        x = Dropout(0.6)(x)
         #x = Dense(self.action_size // 2)(x)
         y = Flatten()(x)
         return y
@@ -86,7 +88,7 @@ class ScalarKerasBinpackNNet():
 
     def y_state(self, x):
 
-        x = Reshape((self.board_x, self.board_y, 1))(x)
+        # x = Reshape((self.board_x, self.board_y, 1))(x)
 
         ## https://keras.io/examples/cifar10_resnet/
         # num_res_blocks = 12
@@ -117,8 +119,9 @@ class ScalarKerasBinpackNNet():
         #     num_filters *= 2
 
         # x = AveragePooling2D(pool_size=3)(x)
-        x = Dense(512)(x)
-        x = Dense(512)(x)
-        x = Dense(512)(x)
+        x = Dense(512, activation='relu')(x)
+        x = Dropout(0.6)(x)
+        x = Dense(512, activation='relu')(x)
+        x = Dropout(0.6)(x)
         y_state = Flatten()(x)
         return y_state

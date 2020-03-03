@@ -123,6 +123,7 @@ def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
                 if n_possible_tiles == 1: # if only one action-tile placement is possible
                     pass
                 else:
+                    _tiles_ints = SolutionChecker.np_array_to_tiles(_tiles_ints)
                     solution_index = _tiles_ints.index(solution_tile_dims)
                     if scalar_tiles:
                         example = [grid.copy(), tiles, one_hot_encode(_tiles_ints, solution_tile_dims, len(tiles) )]
@@ -346,10 +347,9 @@ def main(options):
         # place tiles one by one
         # generate pair x and y where x is stack of state + tiles
         print('Preparing examples')
-        N_EXAMPLES = 1700
+        N_EXAMPLES = 1200
 
         examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
-        print(examples)
         if options['load_examples']:
             with open('models/train_examples.pickle', 'rb') as f:
                 train_examples = pickle.load(f)
@@ -362,7 +362,7 @@ def main(options):
         nnet.train(train_examples)
         nnet.save_checkpoint()
 
-    np.set_printoptions(formatter={'float': lambda x: "{0:0.0f}".format(x)}, linewidth=115)
+    np.set_printoptions(formatter={'float': lambda x: "{0:0.1f}".format(x)}, linewidth=115)
 
     N_EXAMPLES = 20
     examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
@@ -375,6 +375,7 @@ def main(options):
         prediction = nnet.predict([example[0], example[1]])
         if predict_move_index:
             _prediction = prediction
+            print(prediction)
             max_index = np.argmax(prediction)
             _prediction_index = max_index
             if SCALAR_TILES:
