@@ -30,8 +30,10 @@ args = dotdict({
 
 class NNetWrapper(NeuralNet):
     def __init__(self, game, predict_move_index=True, scalar_tiles=True, predict_v=False):
+        self.input_tiles_individually = False
         if scalar_tiles:
-            self.nnet = ScalarKerasBinpackNNet(game, args, predict_move_index=predict_move_index, scalar_tiles=scalar_tiles, predict_v=predict_v)
+            self.nnet = ScalarKerasBinpackNNet(game, args, predict_move_index=predict_move_index, scalar_tiles=scalar_tiles, predict_v=predict_v, 
+                                               individual_tiles = self.input_tiles_individually)
         else:
             self.nnet = onnet(game, args, predict_move_index=predict_move_index, scalar_tiles=scalar_tiles)
         self.board_x, self.board_y, self.channels = game.getBoardSize()
@@ -40,11 +42,11 @@ class NNetWrapper(NeuralNet):
         self.predict_move_index = predict_move_index
         self.scalar_tiles = scalar_tiles
 
+
     def train(self, examples):
         """
         examples: list of examples, each example is of form (board, pi, v)
         """
-        print(args.batch_size)
         if self.predict_v:
             if self.scalar_tiles:
                 input_boards, input_tiles, target_pis, target_vs = list(zip(*examples))
@@ -72,7 +74,13 @@ class NNetWrapper(NeuralNet):
             validation_split=0.2
         )
         if self.scalar_tiles:
-            kwargs['x'] = [input_boards.squeeze(), input_tiles]
+            if self.input_tiles_individually:
+                print(input_tiles.shape, input_boards.shape)
+                kwargs['x'] = [
+                    input_boards.squeeze(),
+                    *[input_tiles[:, x] for x in range(input_tiles.shape[1])]]
+            else:
+                kwargs['x'] = [input_boards.squeeze(), input_tiles]
             self.nnet.model.fit(
                 **kwargs
             )

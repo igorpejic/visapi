@@ -12,15 +12,21 @@ from alpha.binpack.keras.utils import residual_block, resnet_layer
 
 ORIENTATIONS = 2
 class ScalarKerasBinpackNNet():
-    def __init__(self, game, args, predict_move_index=True, scalar_tiles=False, predict_v=False):
+    def __init__(self, game, args, predict_move_index=True, scalar_tiles=False, predict_v=False, individual_tiles=False):
         # game params
         self.board_x, self.board_y, self.channels = game.getBoardSize()
         self.action_size = game.getActionSize()
         self.args = args
 
+        self.individual_tiles = individual_tiles
+
         # s: batch_size x board_x x board_y
         self.input_board = Input(shape=(self.board_x, self.board_y))
-        self.input_tiles = Input(shape=(self.channels - 1, ORIENTATIONS))
+
+        if self.individual_tiles:
+            self.input_tiles = [Input(shape=(1, ORIENTATIONS)) for x in range(self.channels-1)]
+        else:
+            self.input_tiles = Input(shape=(self.channels - 1, ORIENTATIONS))
 
         y = Concatenate(name='concatenation')([self.y_state(self.input_board), self.y_tiles(self.input_tiles)])
 
@@ -39,10 +45,13 @@ class ScalarKerasBinpackNNet():
                 self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi, self.v])
                 self.model.compile(loss=['categorical_crossentropy','mean_squared_error'], optimizer=Adam(args.lr), metrics=['accuracy'])
         else:
-            self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi])
+            if self.individual_tiles:
+                self.model = Model(inputs=[self.input_board, *self.input_tiles], outputs=[self.pi])
+            else:
+                self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi])
             if predict_move_index:
-                # self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
-                self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
+                self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
+                # self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
             else:
                 self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
 
@@ -77,11 +86,17 @@ class ScalarKerasBinpackNNet():
         #     num_filters *= 2
 
         # x = MaxPooling2D(pool_size=3)(x)
-        x = Dense(512, activation='relu')(x)
-        x = Dropout(0.6)(x)
-        x = Dense(512, activation='relu')(x)
-        x = Dropout(0.6)(x)
-        #x = Dense(self.action_size // 2)(x)
+        if self.individual_tiles:
+            l = []
+            for i in range(self.channels - 1):
+                l.append(Dense(10, activation='relu')(x[1]))
+            x = Concatenate()(l)
+            x = Dense(512, activation='relu')(x)
+        else:
+            x = Dense(512, activation='relu')(x)
+            x = Dropout(0.6)(x)
+            x = Dense(512, activation='relu')(x)
+            x = Dropout(0.6)(x)
         y = Flatten()(x)
         return y
 

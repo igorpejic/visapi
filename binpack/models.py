@@ -47,6 +47,7 @@ class Result(models.Model):
     b_their_tiles_placed = models.BigIntegerField(blank=True, null=True, help_text='Amount of tiles placed with heuristics algorithm')
 
     problem_id = models.CharField(blank=True, null=True, max_length=500)
+    solution_tiles_order = JSONField(blank=True, null=True)
 
     improved_sel = models.BooleanField(default=False)
 

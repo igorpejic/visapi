@@ -12,6 +12,7 @@ from solution_checker import SolutionChecker
 import random
 from collections import defaultdict
 
+INDIVIDUAL_TILES = False
 ORIENTATIONS = 2
 
 args = dotdict({
@@ -126,7 +127,12 @@ def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
                     _tiles_ints = SolutionChecker.np_array_to_tiles(_tiles_ints)
                     solution_index = _tiles_ints.index(solution_tile_dims)
                     if scalar_tiles:
-                        example = [grid.copy(), tiles, one_hot_encode(_tiles_ints, solution_tile_dims, len(tiles) )]
+                        if INDIVIDUAL_TILES:
+                            split_tiles = np.array(tiles)
+                            split_tiles = np.split(split_tiles, split_tiles.shape[0])
+                        else:
+                            split_tiles = tiles
+                        example = [grid.copy(), split_tiles, one_hot_encode(_tiles_ints, solution_tile_dims, len(tiles) )]
                     else:
                         example = [state, one_hot_encode(_tiles_ints, solution_tile_dims, state.shape[2] - 1)]
                     examples.append(example)
