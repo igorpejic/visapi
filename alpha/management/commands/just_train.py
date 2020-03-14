@@ -85,13 +85,14 @@ get_tiles_with_orientation = SolutionChecker.get_tiles_with_orientation
 
 def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
                  return_binary_mask=False, predict_v=False, predict_move_index=True,
-                 scalar_tiles=False
+                 scalar_tiles=False, shuffle_tiles_times=40
                  ):
     examples = []
     for i, _example in enumerate(given_examples):
         print(f'{i}/{len(given_examples)}')
         if scalar_tiles:
             state, tiles, solution = _example
+            state = state.squeeze()
         else:
             state, solution = _example
         grid = np.zeros([height, width])
@@ -100,49 +101,49 @@ def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
             solution_order = np.array(solution_copy[solution_index:])
             solution_tile_dims = solution_tile[:2]
 
-            _tiles_ints = [x[:ORIENTATIONS] for x in solution_order]
-            _tiles_ints = get_tiles_with_orientation(_tiles_ints)
-            _tiles_ints = SolutionChecker.get_possible_tile_actions_given_grid(grid, _tiles_ints)
-            np.random.shuffle(_tiles_ints)
-            if scalar_tiles:
-                tiles = tiles_to_np_array(SolutionChecker.pad_tiles_with_zero_scalars(
-                    _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints)))
-                state = state.squeeze()
-            else:
-                tiles = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
-                tiles = pad_tiles_with_zero_matrices(tiles, ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
-                state = np.dstack((np.expand_dims(grid, axis=2), tiles))
-            pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height, return_binary_mask=False).flatten()
-
-            # v = N_TILES - solution_index
-            v = 1
-            if solution_index == len(solution) - 1 :
-                continue
-
-            if predict_move_index:
-                n_possible_tiles = SolutionChecker.get_n_nonplaced_tiles(_tiles_ints)
-                if n_possible_tiles == 1: # if only one action-tile placement is possible
-                    pass
+            for i in range(shuffle_tiles_times): # tile permutations
+                _tiles_ints = [x[:ORIENTATIONS] for x in solution_order]
+                _tiles_ints = get_tiles_with_orientation(_tiles_ints)
+                _tiles_ints = SolutionChecker.get_possible_tile_actions_given_grid(grid, _tiles_ints)
+                np.random.shuffle(_tiles_ints)
+                if scalar_tiles:
+                    tiles = tiles_to_np_array(SolutionChecker.pad_tiles_with_zero_scalars(
+                        _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints)))
                 else:
-                    _tiles_ints = SolutionChecker.np_array_to_tiles(_tiles_ints)
-                    solution_index = _tiles_ints.index(solution_tile_dims)
-                    if scalar_tiles:
-                        if INDIVIDUAL_TILES:
-                            split_tiles = np.array(tiles)
-                            split_tiles = np.split(split_tiles, split_tiles.shape[0])
-                        else:
-                            split_tiles = tiles
-                        example = [grid.copy(), split_tiles, one_hot_encode(_tiles_ints, solution_tile_dims, len(tiles) )]
-                    else:
-                        example = [state, one_hot_encode(_tiles_ints, solution_tile_dims, state.shape[2] - 1)]
-                    examples.append(example)
-                    # print(_tiles_ints, solution_tile_dims, one_hot_encode(_tiles_ints, solution_tile_dims, state))
-            else:
-                example = [state, pi]
-                if predict_v:
-                    example.append(v)
+                    tiles = dg._transform_instance_to_matrix(_tiles_ints, only_one_orientation=True)
+                    tiles = pad_tiles_with_zero_matrices(tiles, ORIENTATIONS * n_tiles - tiles.shape[2], width, height)
+                    state = np.dstack((np.expand_dims(grid, axis=2), tiles))
+                pi = solution_to_solution_matrix(solution_tile, cols=width, rows=height, return_binary_mask=False).flatten()
 
-                examples.append(example)
+                # v = N_TILES - solution_index
+                v = 1
+                if solution_index == len(solution) - 1:
+                    continue
+
+                if predict_move_index:
+                    n_possible_tiles = SolutionChecker.get_n_nonplaced_tiles(_tiles_ints)
+                    if n_possible_tiles == 1: # if only one action-tile placement is possible
+                        pass
+                    else:
+                        _tiles_ints = SolutionChecker.np_array_to_tiles(_tiles_ints)
+                        solution_index = _tiles_ints.index(solution_tile_dims)
+                        if scalar_tiles:
+                            if INDIVIDUAL_TILES:
+                                split_tiles = np.array(tiles)
+                                split_tiles = np.split(split_tiles, split_tiles.shape[0])
+                            else:
+                                split_tiles = tiles
+                            example = [grid.copy(), split_tiles, one_hot_encode(_tiles_ints, solution_tile_dims, len(tiles) )]
+                        else:
+                            example = [state, one_hot_encode(_tiles_ints, solution_tile_dims, state.shape[2] - 1)]
+                        examples.append(example)
+                        # print(_tiles_ints, solution_tile_dims, one_hot_encode(_tiles_ints, solution_tile_dims, state))
+                else:
+                    example = [state, pi]
+                    if predict_v:
+                        example.append(v)
+
+                    examples.append(example)
 
             success, grid = SolutionChecker.place_element_on_grid_given_grid(
                 solution_tile[:ORIENTATIONS], solution_tile[2], val=1, grid=grid, cols=width, rows=height
@@ -335,9 +336,9 @@ def main(options):
     #WIDTH = 8
     SCALAR_TILES = True
     predict_move_index = True
-    N_TILES = 10 
-    HEIGHT = 10
-    WIDTH = 10
+    N_TILES = 20 
+    HEIGHT = 15
+    WIDTH = 15
     g = Game(HEIGHT, WIDTH, N_TILES)
 
     dg = DataGenerator(WIDTH, HEIGHT)
@@ -353,7 +354,7 @@ def main(options):
         # place tiles one by one
         # generate pair x and y where x is stack of state + tiles
         print('Preparing examples')
-        N_EXAMPLES = 1200
+        N_EXAMPLES = 520
 
         examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
         if options['load_examples']:
@@ -368,17 +369,22 @@ def main(options):
         nnet.train(train_examples)
         nnet.save_checkpoint()
 
-    np.set_printoptions(formatter={'float': lambda x: "{0:0.1f}".format(x)}, linewidth=115)
+    np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)}, linewidth=115)
 
-    N_EXAMPLES = 20
+    N_EXAMPLES = 100
     examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
-    _examples = get_examples(examples, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES)[:N_EXAMPLES]
+    _examples = get_examples(examples, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES, shuffle_tiles_times=1)
     total_correct = 0
+    total_random_correct = 0
+    total_max_col_correct = 0
     total_count = 0
     
     n_empty_tiles_with_fails = [0] * (N_TILES + 1)
     for example in _examples:
         prediction = nnet.predict([example[0], example[1]])
+        random_prediction = random.randint(
+            0, SolutionChecker.get_n_nonplaced_tiles(example[1]) - 1)
+        print('-' * 50)
         if predict_move_index:
             _prediction = prediction
             print(prediction)
@@ -389,7 +395,6 @@ def main(options):
             else:
                 expected = np.argmax(example[1])
 
-            print('-' * 50)
             # if not scalar_tiles:
                # print('grid state')
                # print(example[0][:, :, 0])
@@ -408,11 +413,26 @@ def main(options):
             # print(_prediction)
             #print(_prediction_index, prediction_tile)
             print(f'expected: {expected_tile}, got: {prediction_tile}')
+            print(f'random: {example[1][random_prediction]}')
             if SCALAR_TILES:
                 if np.array_equal(expected_tile, prediction_tile):
                     total_correct += 1
                 else:
                     n_empty_tiles_with_fails[count_n_of_non_placed_tiles(example[1]) // 2] += 1
+                if np.array_equal(expected_tile, example[1][random_prediction]):
+                    total_random_correct += 1
+
+                widest_tile = example[1][0]
+                for i, tile in enumerate(example[1]):
+                    if tile[1] > widest_tile[1]:
+                        widest_tile = tile
+                    elif tile[1] == widest_tile[1]:
+                        if tile[0] > widest_tile[0]:
+                            widest_tile = tile
+                if np.array_equal(expected_tile, widest_tile):
+                    total_max_col_correct += 1
+                print(f'max_tile: {widest_tile}')
+
             else:
                 if expected_tile == prediction_tile:
                     total_correct += 1
@@ -432,7 +452,7 @@ def main(options):
             print(_prediction)
 
     if predict_move_index:
-        print(f'In total guessed: {total_correct}/{total_count} = {100*(total_correct/ total_count)}%')
+        print(f'In total guessed: {total_correct}/{total_count} = {100*(total_correct/ total_count)}% Random baseline: {100*(total_random_correct/total_count)}%. Max col tile baseline {100*(total_max_col_correct/total_count)}%')
         print(n_empty_tiles_with_fails)
 
         print('-' * 100)

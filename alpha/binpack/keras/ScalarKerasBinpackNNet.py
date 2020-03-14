@@ -32,8 +32,8 @@ class ScalarKerasBinpackNNet():
 
         if predict_move_index:
             # channels - 1 for state
-            # self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(y)
-            self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(y)
+            self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(y)
+            # self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(y)
         else:
             self.pi = Dense(self.action_size, activation='softmax', name='pi')(y)   # batch_size x self.action_size
 
@@ -93,19 +93,17 @@ class ScalarKerasBinpackNNet():
             x = Concatenate()(l)
             x = Dense(512, activation='relu')(x)
         else:
+            x = Dense(1012, activation='relu')(x)
             x = Dense(512, activation='relu')(x)
-            x = Dropout(0.6)(x)
-            x = Dense(512, activation='relu')(x)
-            x = Dropout(0.6)(x)
         y = Flatten()(x)
         return y
 
 
     def y_state(self, x):
 
-        # x = Reshape((self.board_x, self.board_y, 1))(x)
 
-        ## https://keras.io/examples/cifar10_resnet/
+        # x = Reshape((self.board_x, self.board_y, 1))(x)
+        # # https://keras.io/examples/cifar10_resnet/
         # num_res_blocks = 12
         # num_filters = 3
         # # Instantiate the stack of residual units
@@ -134,9 +132,7 @@ class ScalarKerasBinpackNNet():
         #     num_filters *= 2
 
         # x = AveragePooling2D(pool_size=3)(x)
+        x = Dense(1012, activation='relu')(x)
         x = Dense(512, activation='relu')(x)
-        x = Dropout(0.6)(x)
-        x = Dense(512, activation='relu')(x)
-        x = Dropout(0.6)(x)
         y_state = Flatten()(x)
         return y_state

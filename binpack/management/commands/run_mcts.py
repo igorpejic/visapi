@@ -26,6 +26,8 @@ class NpEncoder(json.JSONEncoder):
             return super(NpEncoder, self).default(obj)
 
 RESULTS_DIR = 'results/'
+
+# TODO: remove
 np.random.seed(123) # reproducibility
 
 ORIENTATIONS = 2
