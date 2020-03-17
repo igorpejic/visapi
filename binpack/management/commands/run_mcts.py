@@ -43,21 +43,19 @@ def run_mcts(options):
     dg = DataGenerator(cols, rows)
     instances = []
     their_info = None
+    count = 0
     if from_file:
         instances_from_file = dg.read_instances()
         for cols_rows, v in instances_from_file[n].items():
             for instance_from_file in v:
-                print(cols_rows)
-                instance = None
-                if cols_rows not in [(16, 21), (21, 16), (28, 15), (29, 12), (15, 28), (12, 29)]:
-                    continue
                 instance = dg.transform_instance_visual_to_tiles_and_board(
                     cols_rows[1], cols_rows[0],
                     instance_from_file.bins, order_tiles=True)
 
             # this is intentionally unindentend; one instance per rows, cols, n_tiles
-            if instance:
-                instances.append((instance, instance_from_file))
+                if instance:
+                    instances.append((instance, instance_from_file))
+        print(len(instances), 'this many instances')
 
         for i, instance in enumerate(instances):
             print(instance)
@@ -68,9 +66,12 @@ def run_mcts(options):
                 tiles, board = instance
                 their_info = None
 
-            run_one_simulation(
-                tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-            strategy=strategy, their_info=their_info)
+            for n_sim in [100, 200, 1000, 2000, 5000]:
+                for strategy in ['avg_depth', 'max_depth']:
+                    ret = run_one_simulation(
+                        tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
+                        strategy=strategy, their_info=their_info)
+        print(f'In total {count} will be solved')
     else:
         for i in range(1000):
             cols = random.randint(10, 20)
@@ -136,9 +137,9 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     results = Result.objects.filter(
         **identifying_kwargs
     )
-    if results and False:
+    if results:
         print(f'Result already exists or is being worked on. Skipping. (results)')
-        return
+        return False
     else:
         Result.objects.create(
             **identifying_kwargs
