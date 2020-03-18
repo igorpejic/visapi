@@ -46,5 +46,6 @@ class Command(BaseCommand):
                 qs = Result.objects.all()
                 fieldnames = ['rows', 'cols', 'n_simulations', 'tiles', 'n_tiles', 'score', 'solution_found',
                               'problem_generator', 'strategy', 'n_tiles_placed', 'their_id', 'their_tiles_placed',
+                              'solution_tiles_order',
                               'problem_id', 'improved_sel']
                 pickle.dump(qs.values(*fieldnames), csv_file)
