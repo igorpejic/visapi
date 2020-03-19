@@ -66,8 +66,8 @@ def run_mcts(options):
                 tiles, board = instance
                 their_info = None
 
-            for n_sim in [100, 200, 1000, 2000, 5000]:
-                for strategy in ['avg_depth', 'max_depth']:
+            for n_sim in [100, 200, 500, 1000, 2000, 5000]:
+                for strategy in ['max_depth', 'avg_depth']:
                     ret = run_one_simulation(
                         tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
                         strategy=strategy, their_info=their_info)
