@@ -22,7 +22,7 @@ class dotdict(dict):
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.5,
-    'epochs': 20,
+    'epochs': 15,
     'batch_size': 64,
     'cuda': False,
     'num_channels': 512,

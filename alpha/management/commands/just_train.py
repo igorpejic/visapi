@@ -85,7 +85,7 @@ get_tiles_with_orientation = SolutionChecker.get_tiles_with_orientation
 
 def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
                  return_binary_mask=False, predict_v=False, predict_move_index=True,
-                 scalar_tiles=False, shuffle_tiles_times=40
+                 scalar_tiles=False, shuffle_tiles_times=20
                  ):
     examples = []
     for i, _example in enumerate(given_examples):
@@ -256,7 +256,7 @@ def play_using_prediction(nnet, width, height, tiles, grid, n_tiles, dg,
         np.random.shuffle(_tiles_ints)
         if scalar_tiles:
             _tiles = tiles_to_np_array(SolutionChecker.pad_tiles_with_zero_scalars(
-                _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints), width, height))
+                _tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints)))
             # state = state.squeeze()
 
             prediction = nnet.predict([grid, tiles_to_np_array(_tiles)])

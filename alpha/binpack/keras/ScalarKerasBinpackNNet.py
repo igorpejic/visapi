@@ -3,12 +3,87 @@ sys.path.append('..')
 from utils import *
 
 import argparse
+import tensorflow as tf
+import keras.backend as K
 from keras.models import *
+from keras import metrics
 from keras.layers import *
 from keras import layers
 from keras.optimizers import *
 from keras.regularizers import l2
 from alpha.binpack.keras.utils import residual_block, resnet_layer
+
+def custom_accuracy(y_true, y_pred):
+    '''
+    Accuracy which chooses the highest predicted probability and checks if that
+    probability is a solution in y_pred.
+    '''
+    # y_true = K.cast(y_true, K.floatx())
+    # y_pred = K.cast(y_pred, K.floatx())
+    y_pred_max = K.argmax(y_pred, axis=-1)
+    num_examples = K.cast(tf.shape(y_pred)[0], y_pred_max.dtype)
+    idx = tf.stack([tf.range(num_examples), y_pred_max], axis=-1)
+    res = tf.gather_nd(y_true, idx)
+    return res
+
+def true_positives(y_true, y_pred):
+    threshold = 0.5
+    y_pred_s = K.cast(K.greater(y_pred, 0.5), K.floatx())
+    correct_pred = y_true * y_pred_s
+    return K.sum(correct_pred) / K.sum(y_true)
+
+def false_positives(y_true, y_pred):
+    threshold = 0.5
+    # y_pred = K.print_tensor(y_pred, message='y_pred')
+    y_pred_s = K.cast(K.greater(y_pred, 0.5), K.floatx())
+    predicted_as_true = y_pred_s
+    predicted_as_true_but_not_true = y_pred_s * (1 - y_true)
+    # print(y_pred, K.eval(y_pred))
+
+    # y_true_size = K.cast(K.shape(y_true), K.floatx())
+    # y_true_size = K.print_tensor(y_true_size, message='y_true size')
+    
+    return K.sum(predicted_as_true_but_not_true) / K.sum(y_true)
+
+
+def binary_focal_loss(gamma=2., alpha=.25):
+    """
+    Binary form of focal loss.
+      FL(p_t) = -alpha * (1 - p_t)**gamma * log(p_t)
+      where p = sigmoid(x), p_t = p or 1 - p depending on if the label is 1 or 0, respectively.
+    References:
+        https://arxiv.org/pdf/1708.02002.pdf
+    Usage:
+     model.compile(loss=[binary_focal_loss(alpha=.25, gamma=2)], metrics=["accuracy"], optimizer=adam)
+    """
+    def binary_focal_loss_fixed(y_true, y_pred):
+        """
+        :param y_true: A tensor of the same shape as `y_pred`
+        :param y_pred:  A tensor resulting from a sigmoid
+        :return: Output tensor.
+        """
+        pt_1 = tf.where(tf.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
+        pt_0 = tf.where(tf.equal(y_true, 0), y_pred, tf.zeros_like(y_pred))
+
+        epsilon = K.epsilon()
+        # clip to prevent NaN's and Inf's
+        pt_1 = K.clip(pt_1, epsilon, 1. - epsilon)
+        pt_0 = K.clip(pt_0, epsilon, 1. - epsilon)
+
+        return -K.sum(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) \
+               -K.sum((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
+
+    return binary_focal_loss_fixed
+
+def weighted_cross_entropy(y_true, y_pred):
+
+    beta = 1 # 4.5
+    y_pred = tf.clip_by_value(y_pred, tf.keras.backend.epsilon(), 1 - tf.keras.backend.epsilon())
+    y_pred = tf.log(y_pred / (1 - y_pred))
+    loss = tf.nn.weighted_cross_entropy_with_logits(logits=y_pred, targets=y_true, pos_weight=beta)
+
+    return tf.reduce_mean(loss)
+    
 
 ORIENTATIONS = 2
 class ScalarKerasBinpackNNet():
@@ -32,8 +107,8 @@ class ScalarKerasBinpackNNet():
 
         if predict_move_index:
             # channels - 1 for state
-            self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(y)
-            # self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(y)
+            # self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(y)
+            self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(y)
         else:
             self.pi = Dense(self.action_size, activation='softmax', name='pi')(y)   # batch_size x self.action_size
 
@@ -50,7 +125,8 @@ class ScalarKerasBinpackNNet():
             else:
                 self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi])
             if predict_move_index:
-                self.model.compile(loss=['categorical_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
+                #self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['binary_accuracy', true_positives, false_positives])
+                self.model.compile(loss=[binary_focal_loss()], optimizer=Adam(args.lr), metrics=['binary_accuracy', true_positives, false_positives, custom_accuracy])
                 # self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
             else:
                 self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
@@ -136,3 +212,4 @@ class ScalarKerasBinpackNNet():
         x = Dense(512, activation='relu')(x)
         y_state = Flatten()(x)
         return y_state
+
