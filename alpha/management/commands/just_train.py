@@ -315,6 +315,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--load_model', action='store_true', help='Load pretrained model')
         parser.add_argument('--load_examples', action='store_true', help='Load train data which was once generated')
+        parser.add_argument('--load_val_examples', action='store_true', help='Load validation examples')
 
     def handle(self, *args, **options):
         main(options)
@@ -354,7 +355,7 @@ def main(options):
         # place tiles one by one
         # generate pair x and y where x is stack of state + tiles
         print('Preparing examples')
-        N_EXAMPLES = 520
+        N_EXAMPLES = 600
 
         examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
         if options['load_examples']:
@@ -371,9 +372,17 @@ def main(options):
 
     np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)}, linewidth=115)
 
-    N_EXAMPLES = 100
-    examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
+    if options['load_val_examples']:
+        with open('models/validation_examples.pickle', 'rb') as f:
+            examples = pickle.load(f)
+    else:
+        N_EXAMPLES = 100
+        examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
+        with open('models/validation_examples.pickle', 'wb') as f:
+            pickle.dump(examples, f)
+
     _examples = get_examples(examples, N_TILES, height, width, dg, from_file=False, return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES, shuffle_tiles_times=1)
+
     total_correct = 0
     total_random_correct = 0
     total_max_col_correct = 0

@@ -12,7 +12,7 @@ from NeuralNet import NeuralNet
 
 import argparse
 from .KerasBinpackNNet import KerasBinpackNNet as onnet
-from .ScalarKerasBinpackNNet import ScalarKerasBinpackNNet
+from .ScalarKerasBinpackNNet import ScalarKerasBinpackNNet, binary_focal_loss, true_positives, false_positives, custom_accuracy
 from keras.models import load_model
 
 class dotdict(dict):
@@ -22,7 +22,7 @@ class dotdict(dict):
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.5,
-    'epochs': 15,
+    'epochs': 1,
     'batch_size': 64,
     'cuda': False,
     'num_channels': 512,
@@ -132,4 +132,11 @@ class NNetWrapper(NeuralNet):
         filepath = os.path.join(folder, filename)
         if not os.path.exists(filepath):
             raise("No model in path {}".format(filepath))
-        self.nnet.model = load_model(filepath)
+        self.nnet.model = load_model(
+            filepath, custom_objects={
+                'binary_focal_loss_fixed': binary_focal_loss(),
+                'true_positives': true_positives,
+                'false_positives': false_positives,
+                'custom_accuracy': custom_accuracy,
+                }
+        )
