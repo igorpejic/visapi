@@ -4,13 +4,23 @@ from utils import *
 
 import argparse
 import tensorflow as tf
-import keras.backend as K
-from keras.models import *
-from keras import metrics
-from keras.layers import *
-from keras import layers
-from keras.optimizers import *
-from keras.regularizers import l2
+if hasattr(tf, 'keras'):
+    import tensorflow.keras.backend as K
+    from tensorflow.keras.models import *
+    from tensorflow.keras import metrics
+    from tensorflow.keras.layers import *
+    from tensorflow.keras import layers
+    from tensorflow.keras.optimizers import *
+    from tensorflow.keras.regularizers import l2
+else:
+    import keras.backend as K
+    from keras.models import *
+    from keras import metrics
+    from keras.layers import *
+    from keras import layers
+    from keras.optimizers import *
+    from keras.regularizers import l2
+
 from alpha.binpack.keras.utils import residual_block, resnet_layer
 
 def custom_accuracy(y_true, y_pred):
@@ -79,8 +89,14 @@ def weighted_cross_entropy(y_true, y_pred):
 
     beta = 1 # 4.5
     y_pred = tf.clip_by_value(y_pred, tf.keras.backend.epsilon(), 1 - tf.keras.backend.epsilon())
-    y_pred = tf.log(y_pred / (1 - y_pred))
-    loss = tf.nn.weighted_cross_entropy_with_logits(logits=y_pred, targets=y_true, pos_weight=beta)
+    if hasattr(tf, 'log'):
+        y_pred = tf.log(y_pred / (1 - y_pred))
+    else:
+        y_pred = tf.math.log(y_pred / (1 - y_pred))
+    if tf.__version__ == '2.1.0':
+        loss = tf.nn.weighted_cross_entropy_with_logits(labels=y_true, logits=y_pred, pos_weight=beta)
+    else:
+        loss = tf.nn.weighted_cross_entropy_with_logits(logits=y_pred, targets=y_true, pos_weight=beta)
 
     return tf.reduce_mean(loss)
     
@@ -132,34 +148,34 @@ class ScalarKerasBinpackNNet():
                 self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
 
     def y_tiles(self, x):
-        # x = Reshape((self.channels -1, ORIENTATIONS, 1))(x)
-        # # y_tiles = Conv2D(5, kernel_size=3, strides=(1, 2), padding='same')(y_tiles)
+        x = Reshape((self.channels -1, ORIENTATIONS, 1))(x)
+        # y_tiles = Conv2D(5, kernel_size=3, strides=(1, 2), padding='same')(y_tiles)
 
-        # num_res_blocks = 3
-        # num_filters = 3
-        # for stack in range(3):
-        #     for res_block in range(num_res_blocks):
-        #         strides = 1
-        #         if stack > 0 and res_block == 0:  # first layer but not first stack
-        #             strides = 2  # downsample
-        #         y = resnet_layer(inputs=x,
-        #                          num_filters=num_filters,
-        #                          strides=strides)
-        #         y = resnet_layer(inputs=y,
-        #                          num_filters=num_filters,
-        #                          activation=None)
-        #         if stack > 0 and res_block == 0:  # first layer but not first stack
-        #             # linear projection residual shortcut connection to match
-        #             # changed dims
-        #             x = resnet_layer(inputs=x,
-        #                              num_filters=num_filters,
-        #                              kernel_size=1,
-        #                              strides=strides,
-        #                              activation=None,
-        #                              batch_normalization=False)
-        #         x = layers.add([x, y])
-        #         x = Activation('relu')(x)
-        #     num_filters *= 2
+        num_res_blocks = 3
+        num_filters = 3
+        for stack in range(3):
+            for res_block in range(num_res_blocks):
+                strides = 1
+                if stack > 0 and res_block == 0:  # first layer but not first stack
+                    strides = 2  # downsample
+                y = resnet_layer(inputs=x,
+                                 num_filters=num_filters,
+                                 strides=strides)
+                y = resnet_layer(inputs=y,
+                                 num_filters=num_filters,
+                                 activation=None)
+                if stack > 0 and res_block == 0:  # first layer but not first stack
+                    # linear projection residual shortcut connection to match
+                    # changed dims
+                    x = resnet_layer(inputs=x,
+                                     num_filters=num_filters,
+                                     kernel_size=1,
+                                     strides=strides,
+                                     activation=None,
+                                     batch_normalization=False)
+                x = layers.add([x, y])
+                x = Activation('relu')(x)
+            num_filters *= 2
 
         # x = MaxPooling2D(pool_size=3)(x)
         if self.individual_tiles:
@@ -170,9 +186,10 @@ class ScalarKerasBinpackNNet():
             x = Dense(512, activation='relu')(x)
         else:
             # x = Dense(1, activation='relu')(x)
-            x = Dense(9, activation='relu')(x)
+            x = Dense(64, activation='relu')(x)
+            #x = Dense(1024, activation='relu')(x)
             #x = Dense(512, activation='relu')(x)
-            #x = Dense(128, activation='relu')(x)
+            #x = Dense(212, activation='relu')(x)
         y = Flatten()(x)
         return y
 
@@ -180,38 +197,39 @@ class ScalarKerasBinpackNNet():
     def y_state(self, x):
 
 
-        # x = Reshape((self.board_x, self.board_y, 1))(x)
-        # # https://keras.io/examples/cifar10_resnet/
-        # num_res_blocks = 12
-        # num_filters = 3
-        # # Instantiate the stack of residual units
-        # for stack in range(3):
-        #     for res_block in range(num_res_blocks):
-        #         strides = 1
-        #         if stack > 0 and res_block == 0:  # first layer but not first stack
-        #             strides = 2  # downsample
-        #         y = resnet_layer(inputs=x,
-        #                          num_filters=num_filters,
-        #                          strides=strides)
-        #         y = resnet_layer(inputs=y,
-        #                          num_filters=num_filters,
-        #                          activation=None)
-        #         if stack > 0 and res_block == 0:  # first layer but not first stack
-        #             # linear projection residual shortcut connection to match
-        #             # changed dims
-        #             x = resnet_layer(inputs=x,
-        #                              num_filters=num_filters,
-        #                              kernel_size=1,
-        #                              strides=strides,
-        #                              activation=None,
-        #                              batch_normalization=False)
-        #         x = layers.add([x, y])
-        #         x = Activation('relu')(x)
-        #     num_filters *= 2
+        #x = Reshape((self.board_x, self.board_y, 1))(x)
+        ## https://keras.io/examples/cifar10_resnet/
+        #num_res_blocks = 12
+        #num_filters = 3
+        ## Instantiate the stack of residual units
+        #for stack in range(3):
+        #    for res_block in range(num_res_blocks):
+        #        strides = 1
+        #        if stack > 0 and res_block == 0:  # first layer but not first stack
+        #            strides = 2  # downsample
+        #        y = resnet_layer(inputs=x,
+        #                         num_filters=num_filters,
+        #                         strides=strides)
+        #        y = resnet_layer(inputs=y,
+        #                         num_filters=num_filters,
+        #                         activation=None)
+        #        if stack > 0 and res_block == 0:  # first layer but not first stack
+        #            # linear projection residual shortcut connection to match
+        #            # changed dims
+        #            x = resnet_layer(inputs=x,
+        #                             num_filters=num_filters,
+        #                             kernel_size=1,
+        #                             strides=strides,
+        #                             activation=None,
+        #                             batch_normalization=False)
+        #        x = layers.add([x, y])
+        #        x = Activation('relu')(x)
+        #    num_filters *= 2
 
         # x = AveragePooling2D(pool_size=3)(x)
         # x = Dense(1, activation='relu')(x)
-        x = Dense(9, activation='relu')(x)
+        # x = Dense(1024, activation='relu')(x)
+        x = Dense(512, activation='relu')(x)
         #x = Dense(512, activation='relu')(x)
         #x = Dense(128, activation='relu')(x)
         y_state = Flatten()(x)

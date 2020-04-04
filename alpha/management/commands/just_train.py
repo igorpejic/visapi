@@ -87,7 +87,7 @@ get_tiles_with_orientation = SolutionChecker.get_tiles_with_orientation
 
 def get_examples(given_examples, n_tiles, height, width, dg, from_file=False,
                  return_binary_mask=False, predict_v=False, predict_move_index=True,
-                 scalar_tiles=False, shuffle_tiles_times=10
+                 scalar_tiles=False, shuffle_tiles_times=40
                  ):
     examples = []
     for i, _example in enumerate(given_examples):

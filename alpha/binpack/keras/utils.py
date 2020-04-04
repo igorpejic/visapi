@@ -1,9 +1,17 @@
 import argparse
-from keras.models import *
-from keras.layers import *
-from keras import layers
-from keras.optimizers import *
-from keras.regularizers import l2
+import tensorflow as tf
+if hasattr(tf, 'keras'):
+    from tensorflow.keras.models import *
+    from tensorflow.keras.layers import *
+    from tensorflow.keras import layers
+    from tensorflow.keras.optimizers import *
+    from tensorflow.keras.regularizers import l2
+else:
+    from keras.models import *
+    from keras.layers import *
+    from keras import layers
+    from keras.optimizers import *
+    from keras.regularizers import l2
 
 def residual_block(y, nb_channels, _strides=(1, 1), _project_shortcut=False):
     shortcut = y
