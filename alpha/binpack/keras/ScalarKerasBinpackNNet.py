@@ -30,7 +30,7 @@ def true_positives(y_true, y_pred):
     threshold = 0.5
     y_pred_s = K.cast(K.greater(y_pred, 0.5), K.floatx())
     correct_pred = y_true * y_pred_s
-    return K.sum(correct_pred) / K.sum(y_true)
+    return K.sum(correct_pred, axis=-1) / K.sum(y_true, axis=-1)
 
 def false_positives(y_true, y_pred):
     threshold = 0.5
@@ -43,7 +43,7 @@ def false_positives(y_true, y_pred):
     # y_true_size = K.cast(K.shape(y_true), K.floatx())
     # y_true_size = K.print_tensor(y_true_size, message='y_true size')
     
-    return K.sum(predicted_as_true_but_not_true) / K.sum(y_true)
+    return K.sum(predicted_as_true_but_not_true, axis=-1) / K.sum(y_true, axis=-1)
 
 
 def binary_focal_loss(gamma=2., alpha=.25):
@@ -70,8 +70,8 @@ def binary_focal_loss(gamma=2., alpha=.25):
         pt_1 = K.clip(pt_1, epsilon, 1. - epsilon)
         pt_0 = K.clip(pt_0, epsilon, 1. - epsilon)
 
-        return -K.sum(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) \
-               -K.sum((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
+        return -K.sum(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1), axis=-1) \
+               -K.sum((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0), axis=-1)
 
     return binary_focal_loss_fixed
 
@@ -126,7 +126,7 @@ class ScalarKerasBinpackNNet():
                 self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi])
             if predict_move_index:
                 #self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['binary_accuracy', true_positives, false_positives])
-                self.model.compile(loss=[binary_focal_loss()], optimizer=Adam(args.lr), metrics=['binary_accuracy', true_positives, false_positives, custom_accuracy])
+                self.model.compile(loss=[weighted_cross_entropy], optimizer=Adam(args.lr), metrics=['binary_accuracy', true_positives, false_positives, custom_accuracy])
                 # self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
             else:
                 self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
