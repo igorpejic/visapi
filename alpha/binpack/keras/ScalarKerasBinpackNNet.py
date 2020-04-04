@@ -169,8 +169,10 @@ class ScalarKerasBinpackNNet():
             x = Concatenate()(l)
             x = Dense(512, activation='relu')(x)
         else:
-            x = Dense(1012, activation='relu')(x)
-            x = Dense(512, activation='relu')(x)
+            # x = Dense(1, activation='relu')(x)
+            x = Dense(9, activation='relu')(x)
+            #x = Dense(512, activation='relu')(x)
+            #x = Dense(128, activation='relu')(x)
         y = Flatten()(x)
         return y
 
@@ -208,8 +210,10 @@ class ScalarKerasBinpackNNet():
         #     num_filters *= 2
 
         # x = AveragePooling2D(pool_size=3)(x)
-        x = Dense(1012, activation='relu')(x)
-        x = Dense(512, activation='relu')(x)
+        # x = Dense(1, activation='relu')(x)
+        x = Dense(9, activation='relu')(x)
+        #x = Dense(512, activation='relu')(x)
+        #x = Dense(128, activation='relu')(x)
         y_state = Flatten()(x)
         return y_state
 
