@@ -51,6 +51,7 @@ class CustomMCTS():
             tile_placed = False
             states = []
             print(len(state.tiles))
+            best_score = 0
             for i, tile in enumerate(state.tiles):
                 success, new_board = SolutionChecker.get_next_turn(state, tile, val, destroy_state=False)
                 self.n_tiles_placed += 1
@@ -74,9 +75,15 @@ class CustomMCTS():
                         print('solution found in simulation!')
                         print(tile)
                         solution_found = True
-                        self.solution_tiles_order.extend([tile] + solution_tiles_order)
+                        if state.tile_placed:
+                            self.solution_tiles_order.extend([state.tile_placed] + [tile] + solution_tiles_order)
+                        else:
+                            self.solution_tiles_order.extend([tile] + solution_tiles_order)
                         return initial_state, depth, solution_found
                     new_state.score = simulation_result
+                    if new_state.score > best_score:
+                        best_tile = tile
+                        best_score = new_state.score
                     new_state.tile_placed = tile
                     state.solution_tiles_order.append(tile)
                     states.append(new_state)
@@ -93,7 +100,9 @@ class CustomMCTS():
             best_action = get_max_index(states) 
             prev_state = state
             new_state = states[best_action]
-            self.solution_tiles_order.append(prev_state.tile_placed)
+            print(best_tile, prev_state.tile_placed)
+            if prev_state.tile_placed:
+                self.solution_tiles_order.append(prev_state.tile_placed)
 
 
             state = new_state
@@ -150,9 +159,12 @@ class CustomMCTS():
             success, new_board = SolutionChecker.get_next_turn(
                 state, valid_moves[next_random_tile_index], val, destroy_state=True)
             self.n_tiles_placed += 1
+            solution_tiles_order.append(valid_moves[next_random_tile_index])
 
             if success == ALL_TILES_USED:
+                print('grid is full')
                 # no LFB on grid; probably means grid is full
+                solution_tiles_order.append(valid_moves[next_random_tile_index])
                 return ALL_TILES_USED, simulation_root_state, solution_tiles_order
             elif success == NO_NEXT_POSITION_TILES_UNUSED:
                 print('no next position with unused tiles')
@@ -163,7 +175,6 @@ class CustomMCTS():
             else:
                 new_tiles = SolutionChecker.eliminate_pair_tiles(state.tiles, valid_moves[next_random_tile_index])
                 new_state = State(board=new_board, tiles=new_tiles, parent=state)
-                solution_tiles_order.append(valid_moves[next_random_tile_index])
 
                 new_state.score = -1  #  because no choice is performed for sequent actions
                 state.children.append(new_state)
