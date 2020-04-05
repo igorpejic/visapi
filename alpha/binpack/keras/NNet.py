@@ -13,7 +13,7 @@ from NeuralNet import NeuralNet
 
 import argparse
 from .KerasBinpackNNet import KerasBinpackNNet as onnet
-from .ScalarKerasBinpackNNet import ScalarKerasBinpackNNet, binary_focal_loss, true_positives, false_positives, custom_accuracy
+from .ScalarKerasBinpackNNet import ScalarKerasBinpackNNet, binary_focal_loss, true_positives, false_positives, custom_accuracy, weighted_cross_entropy
 import tensorflow as tf
 if hasattr(tf, 'keras'):
     from tensorflow.keras.callbacks import Callback
@@ -146,20 +146,28 @@ class NNetWrapper(NeuralNet):
             val_input_boards = np.asarray(val_input_boards)
             val_target_pis = np.asarray(val_target_pis)
             val_y = [val_target_pis]
-            kwargs['validation_data'] = ([val_input_boards.squeeze(), val_input_tiles], (val_y))
-            #kwargs['callbacks'] = callbacks=[tensorboard_callback, NBatchLogger(kwargs['validation_data'], 64)]
-            kwargs['callbacks'] = callbacks=[tensorboard_callback]
+            kwargs['validation_data'] = (
+                [
+                 val_input_boards[..., np.newaxis],
+                 #val_input_boards.squeeze(),
+                 val_input_tiles], (val_y))
+            kwargs['callbacks'] = callbacks=[tensorboard_callback, NBatchLogger(kwargs['validation_data'], 64)]
+            # kwargs['callbacks'] = callbacks=[tensorboard_callback]
         else:
-            kwargs['callbacks'] = callbacks=[tensorboard_callback],
+            kwargs['callbacks'] = callbacks=[tensorboard_callback]
 
         if self.scalar_tiles:
             if self.input_tiles_individually:
                 # print(input_tiles.shape, input_boards.shape)
                 kwargs['x'] = [
                     input_boards.squeeze(),
+                    input_boards,
                     *[input_tiles[:, x] for x in range(input_tiles.shape[1])]]
             else:
-                kwargs['x'] = [input_boards.squeeze(), input_tiles.astype(np.float16)]
+                kwargs['x'] = [
+                    input_boards[..., np.newaxis],
+                    # input_boards.squeeze(),
+                    input_tiles.astype(np.float16)]
 
             self.nnet.model.fit(
                 **kwargs
@@ -179,7 +187,7 @@ class NNetWrapper(NeuralNet):
         # preparing input
         if self.scalar_tiles:
             board, tiles = board
-            board = board[np.newaxis, :, :]
+            board = board[np.newaxis, :, :, np.newaxis]
             tiles = tiles[np.newaxis, :, :].astype(np.float16)
         else:
             board = board[np.newaxis, :, :]
@@ -218,5 +226,6 @@ class NNetWrapper(NeuralNet):
                 'true_positives': true_positives,
                 'false_positives': false_positives,
                 'custom_accuracy': custom_accuracy,
+                'weighted_cross_entropy': weighted_cross_entropy,
                 }
         )

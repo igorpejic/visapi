@@ -112,14 +112,15 @@ class ScalarKerasBinpackNNet():
         self.individual_tiles = individual_tiles
 
         # s: batch_size x board_x x board_y
-        self.input_board = Input(shape=(self.board_x, self.board_y))
+        self.input_board = Input((None, None, 1))
 
         if self.individual_tiles:
             self.input_tiles = [Input(shape=(1, ORIENTATIONS)) for x in range(self.channels-1)]
         else:
             self.input_tiles = Input(shape=(self.channels - 1, ORIENTATIONS))
 
-        y = Concatenate(name='concatenation')([self.y_state(self.input_board), self.y_tiles(self.input_tiles)])
+        y = Concatenate(name='concatenation')(
+            [self.y_state(self.input_board), self.y_tiles(self.input_tiles)])
 
         if predict_move_index:
             # channels - 1 for state
@@ -141,8 +142,9 @@ class ScalarKerasBinpackNNet():
             else:
                 self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi])
             if predict_move_index:
-                #self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['binary_accuracy', true_positives, false_positives])
+                # the best
                 self.model.compile(loss=[weighted_cross_entropy], optimizer=Adam(args.lr), metrics=['binary_accuracy', true_positives, false_positives, custom_accuracy])
+                # self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['binary_accuracy', true_positives, false_positives, custom_accuracy])
                 # self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr), metrics=['categorical_accuracy'])
             else:
                 self.model.compile(loss=['binary_crossentropy'], optimizer=Adam(args.lr))
@@ -150,32 +152,37 @@ class ScalarKerasBinpackNNet():
     def y_tiles(self, x):
         x = Reshape((self.channels -1, ORIENTATIONS, 1))(x)
         # y_tiles = Conv2D(5, kernel_size=3, strides=(1, 2), padding='same')(y_tiles)
+        x = residual_block(x, self.channels, kernel_size=(14, 2))
+        x = residual_block(x, self.channels, kernel_size=(12, 2))
+        x = residual_block(x, self.channels, kernel_size=(6, 2))
+        x = residual_block(x, self.channels, kernel_size=(3, 2))
+        x = residual_block(x, self.channels, kernel_size=(3, 2))
 
-        num_res_blocks = 3
-        num_filters = 3
-        for stack in range(3):
-            for res_block in range(num_res_blocks):
-                strides = 1
-                if stack > 0 and res_block == 0:  # first layer but not first stack
-                    strides = 2  # downsample
-                y = resnet_layer(inputs=x,
-                                 num_filters=num_filters,
-                                 strides=strides)
-                y = resnet_layer(inputs=y,
-                                 num_filters=num_filters,
-                                 activation=None)
-                if stack > 0 and res_block == 0:  # first layer but not first stack
-                    # linear projection residual shortcut connection to match
-                    # changed dims
-                    x = resnet_layer(inputs=x,
-                                     num_filters=num_filters,
-                                     kernel_size=1,
-                                     strides=strides,
-                                     activation=None,
-                                     batch_normalization=False)
-                x = layers.add([x, y])
-                x = Activation('relu')(x)
-            num_filters *= 2
+        #num_res_blocks = 2
+        #num_filters = 6
+        #for stack in range(3):
+        #    for res_block in range(num_res_blocks):
+        #        strides = 1
+        #        if stack > 0 and res_block == 0:  # first layer but not first stack
+        #            strides = 2  # downsample
+        #        y = resnet_layer(inputs=x,
+        #                         num_filters=num_filters,
+        #                         strides=strides)
+        #        y = resnet_layer(inputs=y,
+        #                         num_filters=num_filters,
+        #                         activation=None)
+        #        if stack > 0 and res_block == 0:  # first layer but not first stack
+        #            # linear projection residual shortcut connection to match
+        #            # changed dims
+        #            x = resnet_layer(inputs=x,
+        #                             num_filters=num_filters,
+        #                             kernel_size=1,
+        #                             strides=strides,
+        #                             activation=None,
+        #                             batch_normalization=False)
+        #        x = layers.add([x, y])
+        #        x = Activation('relu')(x)
+        #    num_filters *= 2
 
         # x = MaxPooling2D(pool_size=3)(x)
         if self.individual_tiles:
@@ -186,9 +193,9 @@ class ScalarKerasBinpackNNet():
             x = Dense(512, activation='relu')(x)
         else:
             # x = Dense(1, activation='relu')(x)
-            x = Dense(64, activation='relu')(x)
-            #x = Dense(1024, activation='relu')(x)
-            #x = Dense(512, activation='relu')(x)
+            # x = Dense(64, activation='relu')(x)
+            x = Dense(1024, activation='relu')(x)
+            x = Dense(512, activation='relu')(x)
             #x = Dense(212, activation='relu')(x)
         y = Flatten()(x)
         return y
@@ -229,9 +236,28 @@ class ScalarKerasBinpackNNet():
         # x = AveragePooling2D(pool_size=3)(x)
         # x = Dense(1, activation='relu')(x)
         # x = Dense(1024, activation='relu')(x)
-        x = Dense(512, activation='relu')(x)
+        # x = Dense(512, activation='relu')(x)
         #x = Dense(512, activation='relu')(x)
         #x = Dense(128, activation='relu')(x)
+
+        x = Conv2D(filters=20, 
+             kernel_size=(15, 15), 
+             padding="same", 
+             activation='relu',
+             )(x)
+        x = Conv2D(filters=15, 
+             kernel_size=(10, 10), 
+             padding="same", 
+             activation='relu',
+             )(x)
+        x = Conv2D(filters=10, 
+             kernel_size=(5, 5), 
+             padding="same", 
+             activation='relu',
+             )(x)
+        x = GlobalMaxPooling2D()(x)
+        x = Dense(128, activation='relu')(x)
+        x = Dropout(0.2)(x)
+        # model.add(Dense(10, activation='softmax'))
         y_state = Flatten()(x)
         return y_state
-

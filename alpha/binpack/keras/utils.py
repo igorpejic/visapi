@@ -13,15 +13,15 @@ else:
     from keras.optimizers import *
     from keras.regularizers import l2
 
-def residual_block(y, nb_channels, _strides=(1, 1), _project_shortcut=False):
+def residual_block(y, nb_channels, _strides=(1, 1), _project_shortcut=False, kernel_size=(3,3)):
     shortcut = y
 
     # down-sampling is performed with a stride of 2
-    y = layers.Conv2D(nb_channels, kernel_size=(3, 3), strides=_strides, padding='same')(y)
+    y = layers.Conv2D(nb_channels, kernel_size=kernel_size, strides=_strides, padding='same')(y)
     y = layers.BatchNormalization()(y)
     y = layers.LeakyReLU()(y)
 
-    y = layers.Conv2D(nb_channels, kernel_size=(3, 3), strides=(1, 1), padding='same')(y)
+    y = layers.Conv2D(nb_channels, kernel_size=kernel_size, strides=(1, 1), padding='same')(y)
     y = layers.BatchNormalization()(y)
 
     # identity shortcuts used directly when the input and output are of the same dimensions

@@ -23,10 +23,10 @@ class BinPackGame(Game):
         self.n_tiles = n_tiles
 
         dg = DataGenerator()
-        self.tiles = dg.gen_matrix_instance(n_tiles, width, height)
-        print(self.tiles)
+        #self.tiles = dg.gen_matrix_instance(n_tiles, width, height)
+        # print(self.tiles)
 
-        self._base_board = Board(height, width, self.tiles)
+        #self._base_board = Board(height, width, self.tiles)
 
     def getInitBoard(self):
         # self.initialize(self.height, self.width, self.n_tiles)
@@ -35,13 +35,13 @@ class BinPackGame(Game):
     def getBoardSize(self):
         ORIENTATIONS = 2
         return (
-            self._base_board.height, self._base_board.width,
+            self.height, self.width,
             self.n_tiles * ORIENTATIONS + 1
                 )
 
     def getActionSize(self):
         # allowing moves without gravity physical support
-        return (self._base_board.width * self._base_board.height)
+        return (self.width * self.height)
         # orientations are included in tiles
         # self._base_board.orientations)
 
