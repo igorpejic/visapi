@@ -84,11 +84,8 @@ class dotdict(dict):
 
 args = dotdict({
     'lr': 0.001,
-    'dropout': 0.5,
-    'epochs': 5,
-    'batch_size': 64,
-    'cuda': False,
-    'num_channels': 512,
+    'epochs': 10,
+    'batch_size': 128,
 })
 
 class NNetWrapper(NeuralNet):
@@ -151,8 +148,8 @@ class NNetWrapper(NeuralNet):
                  val_input_boards[..., np.newaxis],
                  #val_input_boards.squeeze(),
                  val_input_tiles], (val_y))
-            kwargs['callbacks'] = callbacks=[tensorboard_callback, NBatchLogger(kwargs['validation_data'], 64)]
-            # kwargs['callbacks'] = callbacks=[tensorboard_callback]
+            #kwargs['callbacks'] = callbacks=[tensorboard_callback, NBatchLogger(kwargs['validation_data'], 64)]
+            kwargs['callbacks'] = callbacks=[tensorboard_callback]
         else:
             kwargs['callbacks'] = callbacks=[tensorboard_callback]
 

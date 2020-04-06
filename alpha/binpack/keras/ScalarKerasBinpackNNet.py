@@ -112,12 +112,12 @@ class ScalarKerasBinpackNNet():
         self.individual_tiles = individual_tiles
 
         # s: batch_size x board_x x board_y
-        self.input_board = Input((None, None, 1))
+        self.input_board = Input((None, None, 1), name='board_input')
 
         if self.individual_tiles:
-            self.input_tiles = [Input(shape=(1, ORIENTATIONS)) for x in range(self.channels-1)]
+            self.input_tiles = [Input(shape=(1, ORIENTATIONS), name='tiles_input') for x in range(self.channels-1)]
         else:
-            self.input_tiles = Input(shape=(self.channels - 1, ORIENTATIONS))
+            self.input_tiles = Input(shape=(self.channels - 1, ORIENTATIONS), name='tiles_input')
 
         y = Concatenate(name='concatenation')(
             [self.y_state(self.input_board), self.y_tiles(self.input_tiles)])
@@ -127,9 +127,12 @@ class ScalarKerasBinpackNNet():
             # self.pi = Dense(self.channels - 1, activation='softmax', name='pi')(y)
             self.pi = Dense(self.channels - 1, activation='sigmoid', name='pi')(y)
         else:
+            # TODO: uncomment for MCTS
             self.pi = Dense(self.action_size, activation='softmax', name='pi')(y)   # batch_size x self.action_size
 
-        self.v = Dense(1, activation='tanh', name='v')(y)                    # batch_size x 1
+        # TODO: uncomment for MCTS
+        if predict_v:
+            self.v = Dense(1, activation='tanh', name='v')(y)                    # batch_size x 1
 
         # 2 losses
         if predict_v:
@@ -152,11 +155,17 @@ class ScalarKerasBinpackNNet():
     def y_tiles(self, x):
         x = Reshape((self.channels -1, ORIENTATIONS, 1))(x)
         # y_tiles = Conv2D(5, kernel_size=3, strides=(1, 2), padding='same')(y_tiles)
-        x = residual_block(x, self.channels, kernel_size=(14, 2))
-        x = residual_block(x, self.channels, kernel_size=(12, 2))
-        x = residual_block(x, self.channels, kernel_size=(6, 2))
-        x = residual_block(x, self.channels, kernel_size=(3, 2))
-        x = residual_block(x, self.channels, kernel_size=(3, 2))
+        from tensorflow.keras.backend import name_scope
+        with name_scope('residual_1') as scope:
+            x = residual_block(x, self.channels, kernel_size=(14, 2), name=scope)
+        with name_scope('residual_2') as scope:
+            x = residual_block(x, self.channels, kernel_size=(12, 2), name=scope)
+        with name_scope('residual_3') as scope:
+            x = residual_block(x, self.channels, kernel_size=(6, 2), name=scope)
+        with name_scope('residual_4') as scope:
+            x = residual_block(x, self.channels, kernel_size=(3, 2), name=scope)
+        with name_scope('residual_5') as scope:
+            x = residual_block(x, self.channels, kernel_size=(3, 2), name=scope)
 
         #num_res_blocks = 2
         #num_filters = 6

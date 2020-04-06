@@ -359,8 +359,8 @@ def main(options):
     SCALAR_TILES = True
     predict_move_index = True
     N_TILES = 20 
-    HEIGHT = 20
-    WIDTH = 20
+    HEIGHT = 47
+    WIDTH = 40
     g = Game(HEIGHT, WIDTH, N_TILES)
 
     dg = DataGenerator(WIDTH, HEIGHT)
@@ -496,9 +496,9 @@ def main(options):
                     # visualize predictions
                     #if not np.array_equal(expected_tile, widest_tile) and VISUALIZE_PREDICTIONS:
                     #   print(output_str)
-                else:
                     if VISUALIZE_PREDICTIONS:
                         print(output_str)
+                else:
                     n_empty_tiles_with_fails[count_n_of_non_placed_tiles(example[1]) // 2] += 1
                 if np.array_equal(expected_tile, example[1][random_prediction]):
                     total_random_correct += 1
