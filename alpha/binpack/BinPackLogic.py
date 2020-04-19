@@ -2,6 +2,7 @@ from collections import namedtuple
 import numpy as np
 
 from data_generator import DataGenerator
+from solution_checker import SolutionChecker
 
 DEFAULT_HEIGHT = 8
 DEFAULT_WIDTH = 8
@@ -14,8 +15,9 @@ class Board():
     """
     BinPack Board.
     """
+    ORIENTATIONS = 2
 
-    def __init__(self, height, width, tiles, state=None, visualization_state=None):
+    def __init__(self, height, width, tiles, n_tiles, state=None, visualization_state=None):
         "Set up initial board configuration."
         """
         tiles - array of tiles with (width, height)
@@ -27,16 +29,19 @@ class Board():
         self.width = width
         self.tiles = tiles
         self.orientations = ORIENTATIONS
+        self.n_tiles = n_tiles
 
 
         if state is None:
-            board = np.zeros([self.height, self.width, 1])
-            self.state = np.dstack((board, self.tiles))
+            board = np.zeros([self.height, self.width])
+            self.state = (board, self.tiles)
             self.vis_state = np.zeros([self.height, self.width])
         else:
-            self.state = state
+            self.state = (state, self.tiles)
             self.vis_state = visualization_state
-        assert self.state.shape == (self.height, self.width, tiles.shape[2] + 1)
+
+        assert len(self.state) == 2
+        assert self.state[0].shape == (self.height, self.width)
 
     def add_tile(self, position, player):
         """
@@ -44,13 +49,24 @@ class Board():
         Position is index (?) on which to place tile.
         We always place the tile which is located at position 1 or 2. 
         """
-        new_stack, vis_state = DataGenerator.play_position(
-            self.state, position, tile_index=DataGenerator.get_n_tiles_placed(self.state),
-            vis_state=self.vis_state
+
+        next_lfb = SolutionChecker.get_next_lfb_on_grid(self.state[0])
+        success, grid = SolutionChecker.place_element_on_grid_given_grid(
+            self.tiles[position],
+            next_lfb, val=1, grid=self.state[0], cols=self.width, rows=self.height
         )
-        self.state = new_stack
-        self.vis_state = vis_state
-        return new_stack, vis_state
+        if success:
+            tiles = [tuple(x) for x in self.tiles]
+            tiles = SolutionChecker.eliminate_pair_tiles(tiles, tuple(self.tiles[position]))
+            zero_tiles_to_add = self.ORIENTATIONS * self.n_tiles - len(tiles)
+            self.tiles = SolutionChecker.pad_tiles_with_zero_scalars(
+                tiles, zero_tiles_to_add)
+
+        self.state = (grid, self.tiles)
+
+        #TODO: what is vis_state
+        self.vis_state = self.state[0]
+        return self.state, self.vis_state
 
 
     def get_valid_moves(self):
@@ -59,16 +75,17 @@ class Board():
         If lower than self.height * self.width it is first orientation, 
         if not it is second
         """
-        tiles = [self.state[1], self.state[2]]
-        final_mask = DataGenerator.get_valid_moves_mask(self.state[0], tiles)
-        final_mask = np.reshape(
-            final_mask, (final_mask.shape[0] * final_mask.shape[1]))
-        return final_mask
+        _tiles_ints = SolutionChecker.get_valid_tile_actions_indexes_given_grid(
+            self.state[0], self.state[1])
+        # _tiles_ints = tiles_to_np_array(SolutionChecker.pad_tiles_with_zero_scalars(_tiles_ints, ORIENTATIONS * n_tiles - len(_tiles_ints)))
+
+        return np.array(_tiles_ints)
 
     def all_tiles_placed(self):
-        ret = (DataGenerator.get_n_tiles_placed(self.state) ==
-               (len(self.state) - 1) // self.orientations)
-        return ret
+        for tile in self.tiles:
+            if not np.array_equal(tile, [0, 0]):
+                return False
+        return True
 
     def get_win_state(self):
         if self.all_tiles_placed() or not np.any(self.get_valid_moves()): 
@@ -88,8 +105,9 @@ class Board():
         """Create copy of board with specified pieces."""
         if state is None:
             state = self.state
-        state = np.copy(state)
-        return Board(self.height, self.width, self.tiles, state, vis_state)
+        state_board = np.copy(state[0])
+        state_tiles = np.copy(state[1])
+        return Board(self.height, self.width, state_tiles, self.n_tiles, state_board, vis_state)
 
     def __str__(self):
         result_str = ''

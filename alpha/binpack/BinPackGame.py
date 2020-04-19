@@ -6,11 +6,13 @@ from Game import Game
 from .BinPackLogic import Board
 
 from data_generator import DataGenerator
+from solution_checker import SolutionChecker
 
 class BinPackGame(Game):
     """
     BinPack Game class implementing the alpha-zero-general Game interface.
     """
+    ORIENTATIONS = 2
 
     def __init__(self, height=None, width=None, n_tiles=None):
         self.initialize(height, width, n_tiles)
@@ -23,13 +25,14 @@ class BinPackGame(Game):
         self.n_tiles = n_tiles
 
         dg = DataGenerator()
-        #self.tiles = dg.gen_matrix_instance(n_tiles, width, height)
+        self.tiles, solution = dg.gen_instance(n_tiles, width, height)
         # print(self.tiles)
 
-        #self._base_board = Board(height, width, self.tiles)
+        _tiles_ints = SolutionChecker.get_tiles_with_orientation(self.tiles)
+        self._base_board = Board(height, width, _tiles_ints, n_tiles)
 
     def getInitBoard(self):
-        # self.initialize(self.height, self.width, self.n_tiles)
+        self.initialize(self.height, self.width, self.n_tiles)
         return self._base_board.state, self._base_board.vis_state
 
     def getBoardSize(self):
@@ -41,15 +44,15 @@ class BinPackGame(Game):
 
     def getActionSize(self):
         # allowing moves without gravity physical support
-        return (self.width * self.height)
+        return self.n_tiles * self.ORIENTATIONS
         # orientations are included in tiles
         # self._base_board.orientations)
 
     def getNextState(self, board, player, action, vis_state=None):
         """Returns a copy of the board with updated move, original board is unmodified."""
-        b = self._base_board.with_state(state=np.copy(board), vis_state=vis_state)
-        b.add_tile(action, player)
-        return b.state, player, b.vis_state
+        _b = self._base_board.with_state(state=np.copy(board), vis_state=vis_state)
+        _b.add_tile(action, player)
+        return _b.state, player, _b.vis_state
 
     def getValidMoves(self, board, player):
         "Any zero value in top row in a valid move"

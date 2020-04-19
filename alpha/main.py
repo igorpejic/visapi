@@ -3,9 +3,15 @@ from Coach import Coach
 
 # from othello.OthelloGame import OthelloGame as Game
 # from othello.tensorflow.NNet import NNetWrapper as nn
-from binpack.tensorflow.NNet import NNetWrapper as nn
+# from binpack.tensorflow.NNet import NNetWrapper as nn
+# from binpack.keras.ScalarKerasBinpackNNet import ScalarKerasBinpackNNet as nn
+from binpack.keras.NNet import NNetWrapper as nn
 from binpack.BinPackGame import BinPackGame as Game
 from utils import *
+
+class dotdict(dict):
+    def __getattr__(self, name):
+        return self[name]
 
 args = dotdict({
     'numIters': 8,
@@ -25,12 +31,12 @@ args = dotdict({
 })
 
 if __name__=="__main__":
-    N_TILES = 8 
-    HEIGHT = 8
-    WIDTH = 8
+    N_TILES = 15 
+    HEIGHT = 20
+    WIDTH = 20
     g = Game(HEIGHT, WIDTH, N_TILES)
 
-    nnet = nn(g)
+    nnet = nn(g, predict_v=True)
 
     if args.load_model and False:
         nnet.load_checkpoint(args.load_folder_file[0], args.load_folder_file[1])

@@ -25,15 +25,7 @@ else:
     from keras.callbacks import Callback
     import keras
 
-logdir = "tensorboard/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-tensorboard_callback = keras.callbacks.TensorBoard(
-    log_dir=logdir,
-    # update_freq='batch',
-)
-file_writer = tf.summary.create_file_writer(logdir + "/metrics")
-file_writer.set_as_default()
 
-current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
 class NBatchLogger(Callback):
@@ -47,6 +39,7 @@ class NBatchLogger(Callback):
         self.metric_cache = {}
         super(NBatchLogger, self).__init__()
         self.validation_data = validation_data
+        self.f = open('tensorboard/batch_detailed.csv', 'w')
 
     def on_batch_end(self, batch, logs={}, **kwargs):
 
@@ -57,6 +50,8 @@ class NBatchLogger(Callback):
 
         if self.validation_data:
             val_logs = self.model.test_on_batch(*self.validation_data)
+            self.f.write(f'{val_logs[-1]}\n')
+
         if self.validation_data:
             for i, k in enumerate([m for m in self.params['metrics'] if 'val_' in m]):
                 self.metric_cache['val_' + k] = self.metric_cache.get(k, 0) + val_logs[i]
@@ -84,7 +79,7 @@ class dotdict(dict):
 
 args = dotdict({
     'lr': 0.001,
-    'epochs': 10,
+    'epochs': 5,
     'batch_size': 128,
 })
 
@@ -101,12 +96,20 @@ class NNetWrapper(NeuralNet):
         self.predict_v = predict_v
         self.predict_move_index = predict_move_index
         self.scalar_tiles = scalar_tiles
+        self.game = game
 
 
     def train(self, examples, validation_data=None):
         """
         examples: list of examples, each example is of form (board, pi, v)
         """
+        logdir = f"tensorboard/{self.game.height}-{self.game.width}{datetime.datetime.now().date()}"
+        tensorboard_callback = keras.callbacks.TensorBoard(
+            log_dir=logdir,
+        )
+        file_writer = tf.summary.create_file_writer(logdir + "/metrics")
+        file_writer.set_as_default()
+
         if self.predict_v:
             if self.scalar_tiles:
                 input_boards, input_tiles, target_pis, target_vs = list(zip(*examples))
@@ -148,7 +151,7 @@ class NNetWrapper(NeuralNet):
                  val_input_boards[..., np.newaxis],
                  #val_input_boards.squeeze(),
                  val_input_tiles], (val_y))
-            #kwargs['callbacks'] = callbacks=[tensorboard_callback, NBatchLogger(kwargs['validation_data'], 64)]
+            # kwargs['callbacks'] = callbacks=[tensorboard_callback, NBatchLogger(kwargs['validation_data'], 1)]
             kwargs['callbacks'] = callbacks=[tensorboard_callback]
         else:
             kwargs['callbacks'] = callbacks=[tensorboard_callback]
@@ -184,6 +187,8 @@ class NNetWrapper(NeuralNet):
         # preparing input
         if self.scalar_tiles:
             board, tiles = board
+            if isinstance(tiles, list):
+                tiles = np.array(tiles)
             board = board[np.newaxis, :, :, np.newaxis]
             tiles = tiles[np.newaxis, :, :].astype(np.float16)
         else:
@@ -204,7 +209,8 @@ class NNetWrapper(NeuralNet):
 
         #print('PREDICTION TIME TAKEN : {0:03f}'.format(time.time()-start))
 
-    def save_checkpoint(self, folder='models', filename='model.h5'):
+    def save_checkpoint(self, folder='models', filename=f'model.h5'):
+        filename = f'{self.game.n_tiles}_{self.game.height}_{self.game.width}_model.h5'
         filepath = os.path.join(folder, filename)
         if not os.path.exists(folder):
             print("Checkpoint Directory does not exist! Making directory {}".format(folder))
@@ -214,6 +220,7 @@ class NNetWrapper(NeuralNet):
         self.nnet.model.save(filepath)
 
     def load_checkpoint(self, folder='models', filename='model.h5'):
+        filename = f'{self.game.n_tiles}_{self.game.height}_{self.game.width}_model.h5'
         filepath = os.path.join(folder, filename)
         if not os.path.exists(filepath):
             raise("No model in path {}".format(filepath))

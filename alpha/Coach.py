@@ -16,7 +16,7 @@ class Coach():
     def __init__(self, game, nnet, args):
         self.game = game
         self.nnet = nnet
-        self.pnet = self.nnet.__class__(self.game)  # the competitor network
+        self.pnet = self.nnet.__class__(self.game, predict_v=True)  # the competitor network
         self.args = args
         self.mcts = MCTS(self.game, self.nnet, self.args)
         self.trainExamplesHistory = []    # history of examples from args.numItersForTrainExamplesHistory latest iterations
@@ -51,7 +51,7 @@ class Coach():
             pi = self.mcts.getActionProb(canonicalBoard, temp=temp)
             sym = self.game.getSymmetries(canonicalBoard, pi)
             for b,p in sym:
-                trainExamples.append([b[0], self.curPlayer, p, None])
+                trainExamples.append([b[0], b[1], self.curPlayer, p, None])
 
             action = np.random.choice(len(pi), p=pi)
             board, self.curPlayer, vis_state = self.game.getNextState(board, self.curPlayer, action)
@@ -60,7 +60,7 @@ class Coach():
 
             if r!=0:
                 # return [(x[0],x[2],r*((-1)**(x[1]!=self.curPlayer))) for x in trainExamples]
-                return [(x[0],x[2],r) for x in trainExamples]
+                return [(x[0],x[1],x[3],r) for x in trainExamples]
 
     def learn(self):
         """

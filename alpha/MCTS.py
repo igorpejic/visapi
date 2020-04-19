@@ -372,7 +372,7 @@ class MCTS():
 
         if _s not in self.Ps:
             # leaf node
-            self.Ps[_s], v = self.nnet.predict(canonicalBoard[0])
+            self.Ps[_s], v = self.nnet.predict(canonicalBoard)
             valids = self.game.getValidMoves(canonicalBoard, 1)
             if valids.all():
                 print(self.Ps[_s])
@@ -417,6 +417,7 @@ class MCTS():
 
         a = best_act
         next_s, next_player, next_vis_state = self.game.getNextState(canonicalBoard, 1, a)
+
         next_s = self.game.getCanonicalForm(next_s, next_player)
 
         v = self.search(next_s)

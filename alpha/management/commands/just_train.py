@@ -14,7 +14,7 @@ import random
 from collections import defaultdict
 
 INDIVIDUAL_TILES = False
-PREDICT_FULL_EXAMPLES = True
+PREDICT_FULL_EXAMPLES = False
 VISUALIZE_PREDICTIONS = False
 ORIENTATIONS = 2
 
@@ -356,213 +356,281 @@ def main(options):
     #N_TILES = 8 
     #HEIGHT = 8
     #WIDTH = 8
-    SCALAR_TILES = True
-    predict_move_index = True
-    N_TILES = 20 
-    HEIGHT = 47
-    WIDTH = 40
-    g = Game(HEIGHT, WIDTH, N_TILES)
+    HEIGHT = 25
+    WIDTH = 25
+    N_TILES = 50 
+    for (WIDTH, HEIGHT) in [(30,30)]:
+    #for N_TILES in [50]:
+        SCALAR_TILES = True
+        predict_move_index = True
+        g = Game(HEIGHT, WIDTH, N_TILES)
 
-    dg = DataGenerator(WIDTH, HEIGHT)
+        dg = DataGenerator(WIDTH, HEIGHT)
 
-    # from alpha.binpack.tensorflow.NNet import NNetWrapper as nn
-    from alpha.binpack.keras.NNet import NNetWrapper as nn
-    nnet = nn(g, scalar_tiles=SCALAR_TILES)
+        # from alpha.binpack.tensorflow.NNet import NNetWrapper as nn
+        from alpha.binpack.keras.NNet import NNetWrapper as nn
+        nnet = nn(g, scalar_tiles=SCALAR_TILES)
 
-    n_tiles, height, width = N_TILES, HEIGHT, WIDTH
+        n_tiles, height, width = N_TILES, HEIGHT, WIDTH
 
-
-    if options['load_val_examples']:
-        with open('models/validation_examples.pickle', 'rb') as f:
-            examples = pickle.load(f)
-    else:
-        N_EXAMPLES = 100
-        examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
-        with open('models/validation_examples.pickle', 'wb') as f:
-            pickle.dump(examples, f)
-
-    validation_examples = get_examples(
-        examples, N_TILES, height, width, dg, from_file=False,
-        return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES, shuffle_tiles_times=1)
-
-    if options['load_model']:
-        nnet.load_checkpoint()
-    else:
-        # place tiles one by one
-        # generate pair x and y where x is stack of state + tiles
-        print('Preparing examples')
-        N_EXAMPLES = 1000
-
-        examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
-        if options['load_examples']:
-            with open('models/train_examples.pickle', 'rb') as f:
-                train_examples = pickle.load(f)
+        if options['load_model']:
+            nnet.load_checkpoint()
         else:
-            train_examples = get_examples(
-                examples, N_TILES, height, width, dg, return_binary_mask=True,
-                predict_move_index=True, scalar_tiles=SCALAR_TILES)
-            with open('models/train_examples.pickle', 'wb') as f:
-                pickle.dump(train_examples, f)
-        nnet.train(train_examples, validation_examples)
-        nnet.save_checkpoint()
+            # place tiles one by one
+            # generate pair x and y where x is stack of state + tiles
+            print('Preparing examples')
+            N_EXAMPLES = 1000
 
-    np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)}, linewidth=115)
-
-
-    total_correct = 0
-    total_random_correct = 0
-    total_max_col_correct = 0
-    total_biggest_tile_correct = 0
-    total_most_common_tile_correct = 0
-    total_count = 0
-    
-    n_empty_tiles_with_fails = [0] * (N_TILES + 1)
-    if False:
-        # overlap was 39/1868 between val and train 
-        get_overlap_between_examples(train_examples, validation_examples)
-        return
-    for example in validation_examples:
-        prediction = nnet.predict([example[0], example[1]])
-        random_prediction = random.randint(
-            0, SolutionChecker.get_n_nonplaced_tiles(example[1]) - 1)
-        output_str =''
-        if VISUALIZE_PREDICTIONS:
-            output_str += f'----------------------------------------------------------'
-            output_str += '\n'
-        if predict_move_index:
-            _prediction = prediction
-            if VISUALIZE_PREDICTIONS:
-                output_str += f'{prediction}\n'
-            max_index = np.argmax(prediction)
-            _prediction_index = max_index
-            if SCALAR_TILES:
-                expected = np.argmax(example[2])
+            examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
+            if options['load_examples']:
+                with open(f'models/train_examples_{N_TILES}_{HEIGHT}_{WIDTH}.pickle', 'rb') as f:
+                    train_examples = pickle.load(f)
             else:
-                expected = np.argmax(example[1])
+                train_examples = get_examples(
+                    examples, N_TILES, height, width, dg, return_binary_mask=True,
+                    predict_move_index=True, scalar_tiles=SCALAR_TILES)
+                with open(f'models/train_examples_{N_TILES}_{HEIGHT}_{WIDTH}.pickle', 'wb') as f:
+                    pickle.dump(train_examples, f)
 
-            # if not scalar_tiles:
-               # print('grid state')
-               # print(example[0][:, :, 0])
-               # print(state_to_tiles_dims(example[0], dg))
-            # print('expected')
-            if SCALAR_TILES:
-                expected_tile = example[1][expected]
-                prediction_tile = example[1][_prediction_index]
-                if VISUALIZE_PREDICTIONS:
-                    output_str += f'{example[1].tolist()}\n'
-            else:
-                expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
-                prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
-            # print(expected, expected_tile)
-            #print('prediction')
-            # print(_prediction)
-            #print(_prediction_index, prediction_tile)
+        if options['load_val_examples']:
+            with open(f'models/validation_examples_{N_TILES}_{HEIGHT}_{WIDTH}.pickle', 'rb') as f:
+                validation_examples = pickle.load(f)
+        else:
+            N_EXAMPLES = 100
+            validation_examples = get_n_examples(N_EXAMPLES, width, height, n_tiles, dg, scalar_tiles=SCALAR_TILES)
+            validation_examples = get_examples(
+                validation_examples, N_TILES, height, width, dg, from_file=False,
+                return_binary_mask=True, predict_move_index=True, scalar_tiles=SCALAR_TILES, shuffle_tiles_times=1)
+            validation_examples = get_val_examples_not_in_overlap(train_examples, validation_examples)
+            with open(f'models/validation_examples_{N_TILES}_{HEIGHT}_{WIDTH}.pickle', 'wb') as f:
+                pickle.dump(validation_examples, f)
+
+        if not options['load_model']:
+            print(f'In total: {len(train_examples)} train examples')
+            print(f'In total: {len(validation_examples)} validation examples')
+
+        if options['load_model']:
+            nnet.load_checkpoint()
+        else:
+            nnet.train(train_examples, validation_examples)
+            nnet.save_checkpoint()
+        np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)}, linewidth=115)
+
+
+        total_correct = 0
+        total_random_correct = 0
+        total_max_col_correct = 0
+        total_max_row_correct = 0
+        total_biggest_tile_correct = 0
+        total_smallest_tile_correct = 0
+        total_most_common_tile_correct = 0
+        total_count = 0
+        
+        n_empty_tiles_with_fails = [0] * (N_TILES + 1)
+        if False:
+            # overlap was 39/1868 between val and train 
+            get_overlap_between_examples(train_examples, validation_examples)
+            return
+
+        if False:
+            get_only_random_predictions(validation_examples)
+            return
+
+        for example in validation_examples:
+            prediction = nnet.predict([example[0], example[1]])
+            random_prediction = random.randint(
+                0, SolutionChecker.get_n_nonplaced_tiles(example[1]) - 1)
+            output_str =''
             if VISUALIZE_PREDICTIONS:
-                output_str += f'{example[0]}\n'
-                output_str += f'expected: {expected_tile}, got: {prediction_tile}'
-                output_str += f'random: {example[1][random_prediction]}'
-            if SCALAR_TILES:
-                widest_tile = example[1][0]
-                biggest_tile = example[1][0]
-                counter = Counter()
-                for i, tile in enumerate(example[1]):
-                    if tile[1] > widest_tile[1]:
-                        widest_tile = tile
-                    elif tile[1] == widest_tile[1]:
-                        if tile[0] > widest_tile[0]:
-                            widest_tile = tile
-                    if tile[1] * tile[0] > biggest_tile[1]:
-                        biggest_tile = tile
-                    counter[tuple(tile.tolist())] += 1
-
-                if np.array_equal(expected_tile, widest_tile):
-                    total_max_col_correct += 1
-
-                if np.array_equal(expected_tile, biggest_tile):
-                    total_biggest_tile_correct += 1
-
-                most_common_tile = np.array(counter.most_common(1)[0][0])
-                if np.array_equal(most_common_tile, np.array([0, 0])):
-                    most_common_tile = np.array(counter.most_common(2)[1][0])
-
-                if np.array_equal(expected_tile, most_common_tile):
-                    total_most_common_tile_correct += 1
-
+                output_str += f'----------------------------------------------------------'
+                output_str += '\n'
+            if predict_move_index:
+                _prediction = prediction
                 if VISUALIZE_PREDICTIONS:
-                    output_str += f'max_tile: {widest_tile}\n'
-
-                if np.array_equal(expected_tile, prediction_tile):
-                    total_correct += 1
-                    # visualize predictions
-                    #if not np.array_equal(expected_tile, widest_tile) and VISUALIZE_PREDICTIONS:
-                    #   print(output_str)
-                    if VISUALIZE_PREDICTIONS:
-                        print(output_str)
+                    output_str += f'{prediction}\n'
+                max_index = np.argmax(prediction)
+                _prediction_index = max_index
+                if SCALAR_TILES:
+                    expected = np.argmax(example[2])
                 else:
-                    n_empty_tiles_with_fails[count_n_of_non_placed_tiles(example[1]) // 2] += 1
+                    expected = np.argmax(example[1])
+
+                # if not scalar_tiles:
+                   # print('grid state')
+                   # print(example[0][:, :, 0])
+                   # print(state_to_tiles_dims(example[0], dg))
+                # print('expected')
+                if SCALAR_TILES:
+                    expected_tile = example[1][expected]
+                    prediction_tile = example[1][_prediction_index]
+                    if VISUALIZE_PREDICTIONS:
+                        output_str += f'{example[1].tolist()}\n'
+                else:
+                    expected_tile = dg.get_matrix_tile_dims(example[0][:, :, expected + 1])
+                    prediction_tile = dg.get_matrix_tile_dims(example[0][:, :, _prediction_index + 1])
+                # print(expected, expected_tile)
+                #print('prediction')
+                # print(_prediction)
+                #print(_prediction_index, prediction_tile)
+                if VISUALIZE_PREDICTIONS:
+                    output_str += f'{example[0]}\n'
+                    output_str += f'expected: {expected_tile}, got: {prediction_tile}'
+                    output_str += f'random: {example[1][random_prediction]}'
+                if SCALAR_TILES:
+                    widest_tile = example[1][0]
+                    highest_tile = example[1][0]
+                    biggest_tile = example[1][0]
+                    smallest_tile = example[1][0]
+                    counter = Counter()
+                    for i, tile in enumerate(example[1]):
+                        if tile[1] > widest_tile[1]:
+                            widest_tile = tile
+                        elif tile[1] == widest_tile[1]:
+                            if tile[0] > widest_tile[0]:
+                                widest_tile = tile
+
+                        if tile[0] > highest_tile[0]:
+                            highest_tile = tile
+                        elif tile[0] == highest_tile[0]:
+                            if tile[1] > highest_tile[1]:
+                                highest_tile = tile
+
+                        if tile[1] * tile[0] > (biggest_tile[1] * biggest_tile[0]):
+                            biggest_tile = tile
+
+                        if tile[1] * tile[0] < (smallest_tile[1] * smallest_tile[0]):
+                            smallest_tile = tile
+
+                        counter[tuple(tile.tolist())] += 1
+
+                    if np.array_equal(expected_tile, widest_tile):
+                        total_max_col_correct += 1
+
+                    if np.array_equal(expected_tile, highest_tile):
+                        total_max_row_correct += 1
+
+                    if np.array_equal(expected_tile, biggest_tile):
+                        total_biggest_tile_correct += 1
+
+                    if np.array_equal(expected_tile, smallest_tile):
+                        total_smallest_tile_correct += 1
+
+                    most_common_tile = np.array(counter.most_common(1)[0][0])
+                    if np.array_equal(most_common_tile, np.array([0, 0])):
+                        most_common_tile = np.array(counter.most_common(2)[1][0])
+
+                    if np.array_equal(expected_tile, most_common_tile):
+                        total_most_common_tile_correct += 1
+
+                    if VISUALIZE_PREDICTIONS:
+                        output_str += f'max_tile: {widest_tile}\n'
+
+                    if np.array_equal(expected_tile, prediction_tile):
+                        total_correct += 1
+                        # visualize predictions
+                        #if not np.array_equal(expected_tile, widest_tile) and VISUALIZE_PREDICTIONS:
+                        #   print(output_str)
+                        if VISUALIZE_PREDICTIONS:
+                            print(output_str)
+                    else:
+                        n_empty_tiles_with_fails[count_n_of_non_placed_tiles(example[1]) // 2] += 1
+                    # print(example[1][random_prediction])
+                    if np.array_equal(expected_tile, example[1][random_prediction]):
+                        total_random_correct += 1
+                else:
+                    if expected_tile == prediction_tile:
+                        total_correct += 1
+
+                    else:
+                        n_empty_tiles_with_fails[count_n_of_non_placed_tiles(state_to_tiles_dims(example[0], dg)) // 2] += 1
+                total_count += 1
+            else:
+                _prediction = np.reshape(prediction, (width, height))
+                _prediction = get_prediction_masked(_prediction, example[0][:, :, 0])
+                expected = np.reshape(example[1], (width, height))
+
+                if VISUALIZE_PREDICTIONS:
+                    # visualize predictions
+                    # print('-' * 50)
+                    # print('grid state')
+                    # print(example[0][:, :, 0])
+                    # print('expected')
+                    # print(expected)
+                    # print('prediction')
+                    # print(_prediction)
+                    pass
+
+        if predict_move_index:
+            with open(f"nn_results/custom_{N_TILES}_{width}_{height}.csv", 'w') as f:
+                output_str = (
+                    f'{width}-{height}\n'
+                    f'In total guessed;{100*(total_correct/ total_count)}; {total_correct}/{total_count}\n'
+                    f'Random baseline; {100*(total_random_correct/total_count)}\n'
+                    f'Max col tile baseline; {100*(total_max_col_correct/total_count)}\n'
+                    f'Max row tile baseline; {100*(total_max_row_correct/total_count)}\n'
+                    f'Most common tile baseline; {100*(total_most_common_tile_correct/total_count)}\n'
+                    f'Max area tile baseline; {100*(total_biggest_tile_correct/total_count)}\n'
+                    f'Min area tile baseline; {100*(total_smallest_tile_correct/total_count)}')
+                f.write(output_str)
+
+            print(output_str)
+            print(n_empty_tiles_with_fails)
+
+            print('-' * 100)
+
+        if not PREDICT_FULL_EXAMPLES:
+            # return
+            continue
+        tiles_left = []
+        for example in examples:
+            if SCALAR_TILES:
+                state, tiles, _ = example
+                tiles = get_tiles_with_orientation(tiles.tolist())
+            else:
+                tiles, _ = example
+            # tiles = dg.get_matrix_tile_dims(tiles)
+            grid = np.zeros((width, height))
+            tiles_left.append(play_using_prediction(
+                nnet, width, height, tiles, grid, N_TILES, dg, predict_move_index, scalar_tiles=SCALAR_TILES))
+            # [0, 6, 4, 2, 2, 2, 0, 4, 4, 8, 6, 2, 2, 6, 6, 8, 6, 4, 4, 4]
+        print(tiles_left)
+        print(np.sum(tiles_left) / len(tiles_left))
+
+def get_only_random_predictions(examples):
+    total_random_correct = 0
+    with open("tensorboard/random_predictions.csv", 'w') as f:
+        for i in range(2755):
+            total_count = 0
+            total_random_correct = 0
+            for example in examples:
+                expected = np.argmax(example[2])
+                expected_tile = example[1][expected]
+                random_prediction = random.randint(
+                    0, SolutionChecker.get_n_nonplaced_tiles(example[1]) - 1)
                 if np.array_equal(expected_tile, example[1][random_prediction]):
                     total_random_correct += 1
+                total_count += 1
 
+            accuracy = (total_random_correct / total_count) * 100
+            f.write(f'{accuracy}\n')
+            print(accuracy)
+    return
 
-            else:
-                if expected_tile == prediction_tile:
-                    total_correct += 1
+def get_val_examples_not_in_overlap(train_examples, val_examples):
+    train_examples_set = set(str(x) for x in train_examples)
+    ret_set = []
+    print(f'in total {len(val_examples)} val examples at beginning')
+    for val_example in val_examples:
+        if str(val_example) not in train_examples_set:
+            ret_set.append(val_example)
+    print(f'in total {len(ret_set)} val examples at end')
+    return ret_set
 
-                else:
-                    n_empty_tiles_with_fails[count_n_of_non_placed_tiles(state_to_tiles_dims(example[0], dg)) // 2] += 1
-            total_count += 1
-        else:
-            _prediction = np.reshape(prediction, (width, height))
-            _prediction = get_prediction_masked(_prediction, example[0][:, :, 0])
-            expected = np.reshape(example[1], (width, height))
-
-            if VISUALIZE_PREDICTIONS:
-                # visualize predictions
-                # print('-' * 50)
-                # print('grid state')
-                # print(example[0][:, :, 0])
-                # print('expected')
-                # print(expected)
-                # print('prediction')
-                # print(_prediction)
-                pass
-
-    if predict_move_index:
-        print(f'In total guessed: {total_correct}/{total_count} = {100*(total_correct/ total_count)}% Random baseline: {100*(total_random_correct/total_count)}%.'
-              f'Max col tile baseline {100*(total_max_col_correct/total_count)}%'
-              f'Most common tile baseline {100*(total_most_common_tile_correct/total_count)}%'
-              f'Max area tile baseline {100*(total_biggest_tile_correct/total_count)}%')
-        print(n_empty_tiles_with_fails)
-
-        print('-' * 100)
-
-    if not PREDICT_FULL_EXAMPLES:
-        return
-    tiles_left = []
-    for example in examples:
-        if SCALAR_TILES:
-            state, tiles, _ = example
-            tiles = get_tiles_with_orientation(tiles.tolist())
-        else:
-            tiles, _ = example
-        # tiles = dg.get_matrix_tile_dims(tiles)
-        grid = np.zeros((width, height))
-        tiles_left.append(play_using_prediction(
-            nnet, width, height, tiles, grid, N_TILES, dg, predict_move_index, scalar_tiles=SCALAR_TILES))
-        # [0, 6, 4, 2, 2, 2, 0, 4, 4, 8, 6, 2, 2, 6, 6, 8, 6, 4, 4, 4]
-    print(tiles_left)
-    print(np.sum(tiles_left) / len(tiles_left))
-
-def get_overlap_between_examples(train_examples, val_examples):
-    train_examples_set = set((str(e) for e in train_examples))
     val_examples_set = set((str(e) for e in val_examples))
-
-
     overlap_elements  = train_examples_set & val_examples_set
     print(f'In total overlap is: {len(overlap_elements)}')
     print(f'In total train examples: {len(train_examples_set)}/ {len(train_examples)}')
     print(f'In total val examples: {len(val_examples_set)}/ {len(val_examples)}')
-    import sys; sys.exit()
 
 if __name__ == "__main__":
     main()

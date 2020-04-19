@@ -138,7 +138,7 @@ class ScalarKerasBinpackNNet():
         if predict_v:
             if predict_move_index:
                 self.model = Model(inputs=[self.input_board, self.input_tiles], outputs=[self.pi, self.v])
-                self.model.compile(loss=['categorical_crossentropy','mean_squared_error'], optimizer=Adam(args.lr), metrics=['accuracy'])
+                self.model.compile(loss=['binary_crossentropy','mean_squared_error'], optimizer=Adam(args.lr), metrics=['binary_accuracy', custom_accuracy])
         else:
             if self.individual_tiles:
                 self.model = Model(inputs=[self.input_board, *self.input_tiles], outputs=[self.pi])
@@ -157,15 +157,15 @@ class ScalarKerasBinpackNNet():
         # y_tiles = Conv2D(5, kernel_size=3, strides=(1, 2), padding='same')(y_tiles)
         from tensorflow.keras.backend import name_scope
         with name_scope('residual_1') as scope:
-            x = residual_block(x, self.channels, kernel_size=(14, 2), name=scope)
+            x = residual_block(x, self.channels, kernel_size=(14, 2), _project_shortcut=True, name=scope)
         with name_scope('residual_2') as scope:
-            x = residual_block(x, self.channels, kernel_size=(12, 2), name=scope)
+            x = residual_block(x, self.channels, kernel_size=(12, 2), _project_shortcut=True, name=scope)
         with name_scope('residual_3') as scope:
-            x = residual_block(x, self.channels, kernel_size=(6, 2), name=scope)
+            x = residual_block(x, self.channels, kernel_size=(6, 2), _project_shortcut=True, name=scope)
         with name_scope('residual_4') as scope:
-            x = residual_block(x, self.channels, kernel_size=(3, 2), name=scope)
+            x = residual_block(x, self.channels, kernel_size=(3, 2), _project_shortcut=True, name=scope)
         with name_scope('residual_5') as scope:
-            x = residual_block(x, self.channels, kernel_size=(3, 2), name=scope)
+            x = residual_block(x, self.channels, kernel_size=(3, 2), _project_shortcut=True, name=scope)
 
         #num_res_blocks = 2
         #num_filters = 6
@@ -205,6 +205,7 @@ class ScalarKerasBinpackNNet():
             # x = Dense(64, activation='relu')(x)
             x = Dense(1024, activation='relu')(x)
             x = Dense(512, activation='relu')(x)
+            x = Dropout(0.2)(x)
             #x = Dense(212, activation='relu')(x)
         y = Flatten()(x)
         return y
