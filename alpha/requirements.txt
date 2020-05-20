@@ -38,7 +38,7 @@ google-api-python-client==1.5.5
 grpcio==1.26.0
 gunicorn==19.4.5
 html5lib==0.9999999
-httplib2==0.11.3
+httplib2==0.18.0
 idna==2.7
 imutils==0.5.3
 ipykernel==5.1.0
