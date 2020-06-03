@@ -73,7 +73,7 @@ class CustomMCTS():
                     new_state = State(
                         board=new_board, tiles=new_tiles, parent=state)
                     state.children.append(new_state)
-                    simulation_result, solution_tiles_order = self.perform_simulations(new_state, N=N)
+                    simulation_result, solution_tiles_order = self.perform_simulations(new_state, N=N, record_simulations=False)
                     if simulation_result == ALL_TILES_USED:
                         print('solution found in simulation!')
                         print(tile)
@@ -123,7 +123,7 @@ class CustomMCTS():
         return initial_state, depth, solution_found
 
 
-    def perform_simulations(self, state, N=3000):
+    def perform_simulations(self, state, N=3000, record_simulations=False):
         '''
         Given a state perform N simulations.
         One simulation consists of either filling container or having no more tiles to place.
@@ -138,11 +138,15 @@ class CustomMCTS():
                 return ALL_TILES_USED, solution_tiles_order
             else:
                 depths.append(depth)
+            if record_simulations:
+                state.children.append(simulation_root_state) #.children
+
         if self.strategy=='max_depth':
             _max = np.max(np.array(depths))
         elif self.strategy == 'avg_depth':
             _max = np.average(np.array(depths))
-        return _max, None
+
+        return _max, solution_tiles_order
 
 
     def perform_simulation(self, state):
