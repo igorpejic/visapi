@@ -38,6 +38,9 @@ class CustomMCTS():
         self.n_tiles_placed = 0
         self.solution_tiles_order = []
 
+        # for MCTS vis purposes
+        self.colorful_states = True
+
     def predict(self, temp=1, N=3000):
         initial_state = self.state
         state = self.state
@@ -46,14 +49,14 @@ class CustomMCTS():
         solution_found = False
 
         depth = 0
-        val = 1
+        self.val = 1
         while len(state.tiles):
             tile_placed = False
             states = []
             print(len(state.tiles))
             best_score = 0
             for i, tile in enumerate(state.tiles):
-                success, new_board = SolutionChecker.get_next_turn(state, tile, val, destroy_state=False)
+                success, new_board = SolutionChecker.get_next_turn(state, tile, self.val, destroy_state=False)
                 self.n_tiles_placed += 1
 
                 if success == ALL_TILES_USED:
@@ -75,6 +78,14 @@ class CustomMCTS():
                         print('solution found in simulation!')
                         print(tile)
                         solution_found = True
+
+                        # update scores of states found in simulation
+                        new_state.score = len(state.tiles) / ORIENTATIONS - 1
+                        _state = new_state.children[0]
+                        while _state.children:
+                            _state.score = (len(_state.tiles) / ORIENTATIONS) - 1
+                            _state = _state.children[0]
+
                         if state.tile_placed:
                             self.solution_tiles_order.extend([state.tile_placed] + [tile] + solution_tiles_order)
                         else:
@@ -94,7 +105,7 @@ class CustomMCTS():
             # PERFORMANCE:
             # for visualization this can be changed
             # all tiles will be 1 inside the frame for performance reasons
-            # val += 1
+            self.val += 1
 
             depth += 1
             best_action = get_max_index(states) 
@@ -123,7 +134,7 @@ class CustomMCTS():
         for n in range(N):
             depth, simulation_root_state, solution_tiles_order = self.perform_simulation(state.copy())
             if depth == ALL_TILES_USED:
-                state.children = simulation_root_state.children
+                state.children = [simulation_root_state] #.children
                 return ALL_TILES_USED, solution_tiles_order
             else:
                 depths.append(depth)
@@ -146,18 +157,21 @@ class CustomMCTS():
         if len(state.tiles) == 0:
             print('perform_simulation called with empty tiles')
             return ALL_TILES_USED, simulation_root_state, solution_tiles_order
+        val = self.val
         while True:
-            val = 1
+            val += 1
             if len(state.tiles) == 0:
                 print('solution found in simulation')
                 return ALL_TILES_USED, simulation_root_state, solution_tiles_order
-            valid_moves = SolutionChecker.get_valid_next_moves(state, state.tiles )
+            valid_moves = SolutionChecker.get_valid_next_moves(state, state.tiles, val=val, colorful_states=self.colorful_states)
             if not valid_moves:
                 return depth, simulation_root_state, solution_tiles_order
 
             next_random_tile_index = random.randint(0, len(valid_moves) -1)
             success, new_board = SolutionChecker.get_next_turn(
-                state, valid_moves[next_random_tile_index], val, destroy_state=True)
+                state, valid_moves[next_random_tile_index], val, destroy_state=True, 
+                colorful_states=self.colorful_states
+            )
             self.n_tiles_placed += 1
             solution_tiles_order.append(valid_moves[next_random_tile_index])
 

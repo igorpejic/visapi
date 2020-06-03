@@ -64,11 +64,11 @@ def run_mcts(options):
             else:
                 tiles, board = instance
                 their_info = None
-            if int(their_info.id) not in [22733, 22943]:
+            if int(their_info.id) not in [22983]:
                 continue
 
-            for n_sim in [5000]:
-                for strategy in ['avg_depth', 'max_depth']:
+            for n_sim in [1000]:
+                for strategy in ['avg_depth']:
                     ret = run_one_simulation(
                         tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
                         strategy=strategy, their_info=their_info)
@@ -93,6 +93,7 @@ def run_mcts(options):
             created_on__gte=datetime.datetime(2020, 1, 18, 12), n_tiles=20, problem_generator='guillotine',
             n_simulations=5000,
             solution_found=True,
+            their_id=22803,
             # solution_tiles_order__isnull=True,
             # problem_id__in=['e76ae306-e973-4394-b4a6-1f960954d6b2'],
             score__isnull=False, improved_sel=True).order_by('n_tiles_placed').values_list('problem_id', flat=True)
@@ -177,6 +178,7 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
     output_filename_base = f'{n}_{cols}_{rows}_{from_file_str}_{N_simulations}'
     k_v_json = json.dumps(k_v, cls=NpEncoder)
 
+    ret.centralize_node_with_children()
     tree_json = json.dumps(ret.render_to_json(), cls=NpEncoder)
     # with open(os.path.join(RESULTS_DIR, output_filename_base) + '_tree.json', 'w') as f:
     #     f.write(tree_json)
@@ -192,16 +194,17 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
         their_id = None
         their_info = None
 
+    print('updateeeeee')
     results.update(
-        # result_tree=tree_json,
+        result_tree=tree_json,
         solution_tiles_order=json.dumps(custom_mcts.solution_tiles_order, cls=NpEncoder),
-        # n_simulations=N_simulations,
-        # n_tiles=int(len(tiles) / ORIENTATIONS),
-        # solution_found=solution_found,
-        # score=score,
-        # n_tiles_placed=custom_mcts.n_tiles_placed,
-        # their_id=their_id,
-        # their_tiles_placed=their_info
+        n_simulations=N_simulations,
+        n_tiles=int(len(tiles) / ORIENTATIONS),
+        solution_found=solution_found,
+        score=score,
+        n_tiles_placed=custom_mcts.n_tiles_placed,
+        their_id=their_id,
+        their_tiles_placed=their_info
     )
     tree, all_nodes = ret.render_children(only_ids=False)
     tr = LeftAligned()
