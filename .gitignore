@@ -23,3 +23,5 @@ alphago/*.swp
 alphago/puzzles.csv
 alphago/results/
 models/
+
+alpha/tensorboard/
