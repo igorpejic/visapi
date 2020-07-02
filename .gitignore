@@ -1,11 +1,10 @@
 *.sqlite3
-secrets.json
+secrets.json.local
 *.pyc
 results/
 puzzles.csv
 *.swp
 *.swo
-secrets.json*
 static/
 .ipynb_checkpoints
 
