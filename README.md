@@ -1,5 +1,7 @@
 # Monte Carlo Tree Search on Perfect Rectangle Packing Problem Instances
 
+![GitHub Logo](/images/perfect_rectangle_packing.png)
+
 ## Installation
 ```
 pip3 install requirements.txt
