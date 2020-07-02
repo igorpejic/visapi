@@ -67,7 +67,7 @@ def run_mcts(options):
             if int(their_info.id) not in [22983]:
                 continue
 
-            for n_sim in [10]:
+            for n_sim in [1000]:
                 for strategy in ['avg_depth']:
                     ret = run_one_simulation(
                         tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
