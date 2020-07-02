@@ -1,4 +1,4 @@
-# Monte Carlo Sree Search for Solving Perfect Rectangle Packing Problems
+# Monte Carlo Tree Search for Solving Perfect Rectangle Packing Problems
 
 ## Installation
 ```
