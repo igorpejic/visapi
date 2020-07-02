@@ -1,4 +1,4 @@
-# Monte Carlo Tree Search for Solving Perfect Rectangle Packing Problems
+# Monte Carlo Tree Search on Perfect Rectangle Packing Problem Instances
 
 ## Installation
 ```
@@ -25,7 +25,11 @@ All experiments results will be saved to the database.
 ## Running experiments
 
 From file:
+```
 SECRETS_FILE=secrets.json.local PYTHONPATH=engine/ python3 manage.py run_mcts 20 11 11 --from_file
+```
 
-Not from file:
+Dynamically generated problems:
+```
 SECRETS_FILE=secrets.json.local PYTHONPATH=engine/ python3 manage.py run_mcts 20 11 11
+```
