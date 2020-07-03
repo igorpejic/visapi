@@ -29,12 +29,24 @@ All experiments results will be saved to the database.
 
 ## Running experiments
 
+### MCTS algorithm
 From file:
 ```
-SECRETS_FILE=secrets.json.local PYTHONPATH=engine/ python3 manage.py run_mcts 20 11 11 --from_file
+PYTHONPATH=engine/ python3 manage.py run_mcts 20 11 11 --from_file
 ```
 
 Dynamically generated problems:
 ```
-SECRETS_FILE=secrets.json.local PYTHONPATH=engine/ python3 manage.py run_mcts 20 11 11
+PYTHONPATH=engine/ python3 manage.py run_mcts 20 11 11
+```
+
+
+### Neural Network algorith
+
+This algorithm performs only one tile placement.
+To get the final solution call the NN predict multiple times.
+
+To train the neural network you can use:
+```
+PYTHONPATH=engine/ python3 manage.py just_train                                                  
 ```
