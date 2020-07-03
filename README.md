@@ -2,6 +2,9 @@
 
 ![GitHub Logo](/images/perfect_rectangle_packing.png)
 
+## Dataset
+The dataset of problems solved is located in [problems](problems/).
+
 ## Installation
 ```
 pip3 install requirements.txt
