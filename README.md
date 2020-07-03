@@ -3,7 +3,7 @@
 ![GitHub Logo](/images/perfect_rectangle_packing.png)
 
 ## Dataset
-The dataset of problems solved is located in [problems](problems/).
+The dataset of 1000 Guillotinable and 1000 Braam rectangle packing problems with 20 tiles can be found in [problems](problems/).
 
 ## Installation
 ```
