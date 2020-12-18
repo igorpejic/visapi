@@ -14,6 +14,8 @@ import argparse
 import uuid
 
 import numpy as np
+
+
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -25,20 +27,23 @@ class NpEncoder(json.JSONEncoder):
         else:
             return super(NpEncoder, self).default(obj)
 
-RESULTS_DIR = 'results/'
+
+RESULTS_DIR = "results/"
 
 # TODO: remove
-np.random.seed(123) # reproducibility
+np.random.seed(123)  # reproducibility
 
 ORIENTATIONS = 2
+
+
 def run_mcts(options):
     random.seed()
-    cols = options['cols']
-    rows = options['rows']
-    n = options['n_tiles']
-    from_file = options['from_file']
-    n_sim = options['n_sim']
-    strategy = 'avg_depth' if options['avg_depth'] else 'max_depth'
+    cols = options["cols"]
+    rows = options["rows"]
+    n = options["n_tiles"]
+    from_file = options["from_file"]
+    n_sim = options["n_sim"]
+    strategy = "avg_depth" if options["avg_depth"] else "max_depth"
 
     dg = DataGenerator(cols, rows)
     instances = []
@@ -49,13 +54,16 @@ def run_mcts(options):
         for cols_rows, v in instances_from_file[n].items():
             for instance_from_file in v:
                 instance = dg.transform_instance_visual_to_tiles_and_board(
-                    cols_rows[1], cols_rows[0],
-                    instance_from_file.bins, order_tiles=True)
+                    cols_rows[1],
+                    cols_rows[0],
+                    instance_from_file.bins,
+                    order_tiles=True,
+                )
 
-            # this is intentionally unindentend; one instance per rows, cols, n_tiles
+                # this is intentionally unindentend; one instance per rows, cols, n_tiles
                 if instance:
                     instances.append((instance, instance_from_file))
-        print(len(instances), 'this many instances')
+        print(len(instances), "this many instances")
 
         for i, instance in enumerate(instances):
             if from_file:
@@ -68,49 +76,93 @@ def run_mcts(options):
                 continue
 
             for n_sim in [1000]:
-                for strategy in ['avg_depth']:
+                for strategy in ["avg_depth"]:
                     ret = run_one_simulation(
-                        tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-                        strategy=strategy, their_info=their_info)
-        print(f'In total {count} will be solved')
+                        tiles,
+                        board,
+                        board.shape[1],
+                        board.shape[0],
+                        n_sim,
+                        from_file,
+                        strategy=strategy,
+                        their_info=their_info,
+                    )
+        print(f"In total {count} will be solved")
     else:
-        # for i in range(1000):
-        #     cols = random.randint(10, 20)
-        #     rows = random.randint(10, 20)
-        #     dg = DataGenerator(cols, rows)
-        #     tiles, board = dg.gen_tiles_and_board(
-        #     n, cols, rows, order_tiles=True, from_file=from_file)
-        #     problem_identifier = uuid.uuid4()
-        #     for n_sim in [5000]:
-        #         for strategy in ['max_depth', 'avg_depth']:
-        #             run_one_simulation(
-        #                tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-        #                strategy=strategy, their_info=their_info,
-        #                problem_identifier=problem_identifier)
+        for i in range(1000):
+            cols = random.randint(10, 20)
+            rows = random.randint(10, 20)
+            dg = DataGenerator(cols, rows)
+            tiles, board = dg.gen_tiles_and_board(
+                n, cols, rows, order_tiles=True, from_file=from_file
+            )
+            problem_identifier = uuid.uuid4()
+            for n_sim in [5000]:
+                for strategy in ["max_depth", "avg_depth"]:
+                    run_one_simulation(
+                        tiles,
+                        board,
+                        board.shape[1],
+                        board.shape[0],
+                        n_sim,
+                        from_file,
+                        strategy=strategy,
+                        their_info=their_info,
+                        problem_identifier=problem_identifier,
+                    )
 
-        import datetime
-        result_ids = Result.objects.filter(
-            created_on__gte=datetime.datetime(2020, 1, 18, 12), n_tiles=20, problem_generator='guillotine',
-            n_simulations=5000,
-            solution_found=True,
-            their_id=22803,
-            # solution_tiles_order__isnull=True,
-            # problem_id__in=['e76ae306-e973-4394-b4a6-1f960954d6b2'],
-            score__isnull=False, improved_sel=True).order_by('n_tiles_placed').values_list('problem_id', flat=True)
-        for n_sim in [5000]:
-            for res_id in result_ids:
-                for strategy in ['avg_depth']:
-                    res = Result.objects.filter(solution_found=True, problem_generator='guillotine', problem_id=res_id, strategy=strategy, n_simulations=5000).first()
-                    if res:
-                        run_simulation_on_same_problem_as_result(res, strategy, n_sim, from_file, their_info)
+        # Used to rerun problem on already generated problem:
+        # import datetime
 
-def run_simulation_on_same_problem_as_result(result, strategy, n_sim, from_file, their_info):
+        # result_ids = (
+        #     Result.objects.filter(
+        #         created_on__gte=datetime.datetime(2020, 1, 18, 12),
+        #         n_tiles=20,
+        #         problem_generator="guillotine",
+        #         n_simulations=5000,
+        #         solution_found=True,
+        #         their_id=22803,
+        #         # solution_tiles_order__isnull=True,
+        #         # problem_id__in=['e76ae306-e973-4394-b4a6-1f960954d6b2'],
+        #         score__isnull=False,
+        #         improved_sel=True,
+        #     )
+        #     .order_by("n_tiles_placed")
+        #     .values_list("problem_id", flat=True)
+        # )
+        # for n_sim in [5000]:
+        #     for res_id in result_ids:
+        #         for strategy in ["avg_depth"]:
+        #             res = Result.objects.filter(
+        #                 solution_found=True,
+        #                 problem_generator="guillotine",
+        #                 problem_id=res_id,
+        #                 strategy=strategy,
+        #                 n_simulations=5000,
+        #             ).first()
+        #             if res:
+        #                 run_simulation_on_same_problem_as_result(
+        #                     res, strategy, n_sim, from_file, their_info
+        #                 )
+
+
+def run_simulation_on_same_problem_as_result(
+    result, strategy, n_sim, from_file, their_info
+):
     board = np.zeros((result.rows, result.cols))
     tiles = tiles_to_tuples(result.tiles)
     run_one_simulation(
-        tiles, board, board.shape[1], board.shape[0], n_sim, from_file,
-    strategy=strategy, their_info=their_info,
-        problem_identifier=result.problem_id)
+        tiles,
+        board,
+        board.shape[1],
+        board.shape[0],
+        n_sim,
+        from_file,
+        strategy=strategy,
+        their_info=their_info,
+        problem_identifier=result.problem_id,
+    )
+
 
 def tiles_to_tuples(tiles):
     res = []
@@ -119,42 +171,48 @@ def tiles_to_tuples(tiles):
     return res
 
 
-def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max_depth', their_info=None, problem_identifier=None):
+def run_one_simulation(
+    tiles,
+    board,
+    cols,
+    rows,
+    n_sim,
+    from_file,
+    strategy="max_depth",
+    their_info=None,
+    problem_identifier=None,
+):
 
     # reproducibility
     random.seed(123)
     n = len(tiles) / ORIENTATIONS
     N_simulations = n_sim
-    problem_generator = 'florian' if from_file else 'guillotine'
-    print(f'Starting problem with rows {rows}, cols {cols} and {len(tiles) / 2} tiles')
-    print(f'TILES: {tiles}')
-    print(f'Performing: {N_simulations} simulations per possible tile-action')
+    problem_generator = "florian" if from_file else "guillotine"
+    print(f"Starting problem with rows {rows}, cols {cols} and {len(tiles) / 2} tiles")
+    print(f"TILES: {tiles}")
+    print(f"Performing: {N_simulations} simulations per possible tile-action")
 
     identifying_kwargs = {
-        'rows': rows,
-        'cols': cols,
-        'n_simulations': N_simulations,
-        'tiles': tiles,
-        'problem_generator': problem_generator,
-        'strategy': strategy,
-        'problem_id': problem_identifier,
-        'improved_sel': True
+        "rows": rows,
+        "cols": cols,
+        "n_simulations": N_simulations,
+        "tiles": tiles,
+        "problem_generator": problem_generator,
+        "strategy": strategy,
+        "problem_id": problem_identifier,
+        "improved_sel": True,
     }
-    results = Result.objects.filter(
-        **identifying_kwargs
-    )
+    results = Result.objects.filter(**identifying_kwargs)
     if results.count() > 1:
         print(results.values())
-        print('more than 1 result')
+        print("more than 1 result")
         # return False
 
     if results:
-        print(f'Result already exists or is being worked on. Skipping. (results)')
+        print(f"Result already exists or is being worked on. Skipping. (results)")
         # return False
     else:
-        Result.objects.create(
-            **identifying_kwargs
-        )
+        Result.objects.create(**identifying_kwargs)
 
     custom_mcts = CustomMCTS(tiles, board, strategy=strategy)
 
@@ -168,14 +226,13 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
 
     tree, all_nodes = ret.render_children(only_ids=True)
 
-
     k_v = {key: all_nodes[key].to_json() for key in all_nodes.keys()}
 
-    from_file_str = ''
+    from_file_str = ""
     if from_file:
-        from_file_str = 'from_file'
+        from_file_str = "from_file"
 
-    output_filename_base = f'{n}_{cols}_{rows}_{from_file_str}_{N_simulations}'
+    output_filename_base = f"{n}_{cols}_{rows}_{from_file_str}_{N_simulations}"
     k_v_json = json.dumps(k_v, cls=NpEncoder)
 
     ret.centralize_node_with_children()
@@ -194,29 +251,31 @@ def run_one_simulation(tiles, board, cols, rows, n_sim, from_file, strategy='max
         their_id = None
         their_info = None
 
-    print('updateeeeee')
+    print("updateeeeee")
     results.update(
         result_tree=tree_json,
-        solution_tiles_order=json.dumps(custom_mcts.solution_tiles_order, cls=NpEncoder),
+        solution_tiles_order=json.dumps(
+            custom_mcts.solution_tiles_order, cls=NpEncoder
+        ),
         n_simulations=N_simulations,
         n_tiles=int(len(tiles) / ORIENTATIONS),
         solution_found=solution_found,
         score=score,
         n_tiles_placed=custom_mcts.n_tiles_placed,
         their_id=their_id,
-        their_tiles_placed=their_info
+        their_tiles_placed=their_info,
     )
     tree, all_nodes = ret.render_children(only_ids=False)
     tr = LeftAligned()
     res = tr(tree)
     print(res)
-    print('Final order of tiles:')
+    print("Final order of tiles:")
     print(len(custom_mcts.solution_tiles_order), custom_mcts.solution_tiles_order)
-    print(f'Tiles placed: {custom_mcts.n_tiles_placed}')
+    print(f"Tiles placed: {custom_mcts.n_tiles_placed}")
 
-    output_filename = output_filename_base + '.txt'
+    output_filename = output_filename_base + ".txt"
     output_filename = os.path.join(RESULTS_DIR, output_filename)
-    with open(output_filename, 'w') as f:
+    with open(output_filename, "w") as f:
         f.write(res)
     return ret
 
@@ -225,19 +284,29 @@ class Command(BaseCommand):
     help = "Run mcts"
 
     def add_arguments(self, parser):
-        parser.add_argument('n_tiles', type=int, default=10, help='number of tiles')
-        parser.add_argument('rows', type=int, default=10, help='number of rows')
-        parser.add_argument('cols', type=int, default=10, help='number of cols')
-        parser.add_argument('--n_sim', type=int, default=10, help='number of simulations from each action')
-        parser.add_argument('--from_file', action='store_true', help='use instances from file')
-        parser.add_argument('--avg_depth', action='store_true', help='avg_depth')
-        parser.add_argument('--profile', action='store_true', help='Profile for performance bottlenecks')
+        parser.add_argument("n_tiles", type=int, default=10, help="number of tiles")
+        parser.add_argument("rows", type=int, default=10, help="number of rows")
+        parser.add_argument("cols", type=int, default=10, help="number of cols")
+        parser.add_argument(
+            "--n_sim",
+            type=int,
+            default=10,
+            help="number of simulations from each action",
+        )
+        parser.add_argument(
+            "--from_file", action="store_true", help="use instances from file"
+        )
+        parser.add_argument("--avg_depth", action="store_true", help="avg_depth")
+        parser.add_argument(
+            "--profile", action="store_true", help="Profile for performance bottlenecks"
+        )
 
     def handle(self, *args, **options):
-        if options['profile']:
-            print('Calling in profile mode')
+        if options["profile"]:
+            print("Calling in profile mode")
             from pstats import SortKey
             import cProfile, pstats, io
+
             pr = cProfile.Profile()
             pr.enable()
             pr.runcall(run_mcts, options)
@@ -247,8 +316,8 @@ class Command(BaseCommand):
             ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
             ps.print_stats()
             print(s.getvalue())
-            #with open('profile.out', 'w') as f:
+            # with open('profile.out', 'w') as f:
             #    f.write(pr.dump_stats('profile.out'))
-            pr.dump_stats('profile.out')
+            pr.dump_stats("profile.out")
         else:
             run_mcts(options)
