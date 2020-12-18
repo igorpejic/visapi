@@ -14,10 +14,9 @@ To run experiments, you will need to have a PostgreSQL database running.
 
 After installing the PostgreSQL database you can create one by logging into the psql shell and running:
 
-```
+```psql
 postgres=# create role binpack_user;
 CREATE ROLE
-
 postgres=# create database binpack;
 CREATE DATABASE
 postgres=# grant all on database binpack to binpack_user;
@@ -39,7 +38,7 @@ HOST, DATABASE_NAME, USER, PASSWORD, PORT
 ```
 
 For the example provided, the contents of the file would be:
-```
+```json
 {
     "SECRET_KEY": "something_random",
     "DATABASE": ["localhost", "binpack", "binpack_user", "password", ""]
@@ -48,7 +47,7 @@ For the example provided, the contents of the file would be:
 
 To create a database schema, you will need to run:
 
-```
+```shell
 python3 manage.py migrate
 ```
 
@@ -61,15 +60,15 @@ python3 manage.py shell_plus
 
 And then:
 
-```
+```python
 Result.objects.all()
 ```
 
-See Django ORM (reference)[https://docs.djangoproject.com/en/3.1/topics/db/queries/#making-queries].
+See Django ORM [reference](https://docs.djangoproject.com/en/3.1/topics/db/queries/#making-queries).
 
 
 Or access them using postgresql shell:
-```
+```psql
 select * from affinity;
 ```
 
