@@ -41,10 +41,10 @@ PYTHONPATH=engine/ python3 manage.py run_mcts 20 11 11
 ```
 
 
-### Neural Network algorith
+### Neural Network algorithm
 
 This algorithm performs only one tile placement.
-To get the final solution call the NN predict multiple times.
+To get the final solution calls the NN predict multiple times.
 
 To train the neural network you can use:
 ```
