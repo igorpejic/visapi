@@ -15,7 +15,7 @@ numpy==1.16.0
 packaging==20.0
 pathtools==0.1.2
 pluggy==0.13.1
-py==1.8.1
+py==1.10.0
 pyparsing==2.4.6
 pytest==5.2.0
 pytest-watch==4.2.0
